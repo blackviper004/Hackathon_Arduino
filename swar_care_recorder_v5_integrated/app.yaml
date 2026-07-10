@@ -1,0 +1,7 @@
+name: Swar_Care_recorder_V5_integrated
+description: ""
+ports: []
+bricks:
+- arduino:web_ui: {}
+- arduino:streamlit_ui: {}
+icon: 😀
