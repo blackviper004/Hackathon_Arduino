@@ -368,19 +368,17 @@ class SwarCareEngine:
 
             target_hw = self._determine_audio_device()
             audio_cmd = self._determine_audio_command(target_hw)
-            self.audio_process = subprocess.Popen(
-                audio_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
-            )
+            try:
+                self.audio_process = subprocess.Popen(
+                    audio_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
+                )
+            except Exception:
+                self.audio_process = None
 
             self.active_session_id = next_run_id
             self.start_system_time = time.time()
             self.stop_system_time = 0.0
             self.state = "RECORDING"
-
-            try:
-                Bridge.notify("arm_recording", self.active_session_id)
-            except Exception:
-                pass
 
             threading.Thread(
                 target=self._audio_capture_worker,
@@ -399,11 +397,6 @@ class SwarCareEngine:
             if self.state in ["RECORDING", "PAUSED"]:
                 self.stop_system_time = time.time()
                 self.state = "STOPPING"
-
-                try:
-                    Bridge.notify("stop_recording", getattr(self, "active_session_id", 0))
-                except Exception:
-                    pass
 
                 if self.audio_process:
                     try:
@@ -500,11 +493,17 @@ class SwarCareEngine:
     def _audio_capture_worker(self, proc):
         # Read in 640-byte chunks (20ms at 16kHz int16) for instant, low-latency audio streaming
         CHUNK_SIZE = 640
-        while self.state in ["RECORDING", "PAUSED"] and proc.poll() is None:
+        while self.state in ["RECORDING", "PAUSED"]:
+            if proc is not None and proc.poll() is not None:
+                break
             try:
-                raw_bytes = proc.stdout.read(CHUNK_SIZE)
-                if not raw_bytes:
-                    break
+                if proc is not None and proc.stdout:
+                    raw_bytes = proc.stdout.read(CHUNK_SIZE)
+                    if not raw_bytes:
+                        break
+                else:
+                    time.sleep(0.02)
+                    raw_bytes = b"\x00" * CHUNK_SIZE
 
                 if self.state != "RECORDING":
                     continue

@@ -4,6 +4,7 @@ import os
 import time
 import urllib.parse
 import zipfile
+import hashlib
 from datetime import datetime
 
 import streamlit as st
@@ -30,30 +31,60 @@ fetch('/settime', {
     height=0,
 )
 
-# Inject Mobile Viewport & Touch Responsive CSS Rules
+# Inject Modern Viewport & Responsive CSS Rules
 st.markdown(
     """
 <style>
+    /* Centralized Color Tokens & Design System */
+    :root {
+        --bg-primary: #0E1117;
+        --bg-surface: #161B22;
+        --bg-surface-elevated: #21262D;
+        --border-subtle: #30363D;
+        --border-accent: #00BCD4;
+        --text-primary: #F0F6FC;
+        --text-secondary: #8B949E;
+        --text-muted: #6E7681;
+        --accent-cyan: #00BCD4;
+        --accent-green: #00E676;
+        --accent-amber: #FFA000;
+        --accent-red: #FF5252;
+        --btn-bg: #21262D;
+        --btn-text: #F0F6FC;
+        --btn-border: #30363D;
+        --btn-hover-bg: #30363D;
+        --btn-disabled-bg: #161B22;
+        --btn-disabled-text: #6E7681;
+        --btn-disabled-border: #21262D;
+    }
+
+    /* Global Clean Dark Typography & Theme */
+    .stApp {
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+    }
+
     /* Mobile-First Layout Adjustments */
     @media (max-width: 640px) {
         .block-container {
-            padding-left: 0.5rem !important;
-            padding-right: 0.5rem !important;
+            padding-left: 0.6rem !important;
+            padding-right: 0.6rem !important;
             padding-top: 1rem !important;
             padding-bottom: 2rem !important;
         }
-        h1 { font-size: 1.45rem !important; }
-        h2 { font-size: 1.2rem !important; }
-        h3 { font-size: 1.0rem !important; }
+        h1 { font-size: 1.4rem !important; color: #FFFFFF !important; }
+        h2 { font-size: 1.15rem !important; color: var(--text-primary) !important; }
+        h3 { font-size: 0.95rem !important; color: var(--text-primary) !important; }
 
         /* Metric Scaling for Mobile Screens */
         [data-testid="stMetricValue"] {
-            font-size: 1.2rem !important;
+            font-size: 1.15rem !important;
+            color: #FFFFFF !important;
         }
         [data-testid="stMetricLabel"] {
-            font-size: 0.72rem !important;
+            font-size: 0.75rem !important;
+            color: var(--text-secondary) !important;
         }
-        /* Mobile Touch Target Padding */
         .stButton button {
             padding-top: 0.5rem !important;
             padding-bottom: 0.5rem !important;
@@ -61,10 +92,100 @@ st.markdown(
         }
     }
 
-    /* Clean Seamless Iframes */
+    /* Clean Seamless Iframes with Zero Outer Overflow */
     iframe {
         width: 100% !important;
         border: none !important;
+        overflow: hidden !important;
+        display: block !important;
+    }
+
+    /* Polished Card Container Styling */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        border-color: var(--border-subtle) !important;
+        background-color: var(--bg-surface);
+        border-radius: 8px;
+        transition: border-color 0.2s ease-in-out;
+    }
+
+    /* Centralized Action Button Styling with Maximum Readability */
+    div[data-testid="stButton"] button,
+    div[data-testid="stDownloadButton"] button {
+        background-color: var(--btn-bg) !important;
+        color: var(--btn-text) !important;
+        border: 1px solid var(--btn-border) !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        transition: all 0.15s ease-in-out !important;
+    }
+
+    div[data-testid="stButton"] button:hover:not(:disabled),
+    div[data-testid="stDownloadButton"] button:hover:not(:disabled) {
+        background-color: var(--btn-hover-bg) !important;
+        border-color: var(--border-accent) !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 2px 8px rgba(0, 188, 212, 0.25) !important;
+    }
+
+    div[data-testid="stButton"] button:disabled,
+    div[data-testid="stDownloadButton"] button:disabled {
+        background-color: var(--btn-disabled-bg) !important;
+        color: var(--btn-disabled-text) !important;
+        border-color: var(--btn-disabled-border) !important;
+        opacity: 0.65 !important;
+        cursor: not-allowed !important;
+    }
+
+    /* Hardware Control Deck Dynamic Button Palette */
+    div[data-testid="column"]:nth-child(1) div[data-testid="stButton"] button:not(:disabled) {
+        border-color: rgba(0, 230, 118, 0.4) !important;
+        color: var(--accent-green) !important;
+    }
+    div[data-testid="column"]:nth-child(1) div[data-testid="stButton"] button:hover:not(:disabled) {
+        background-color: rgba(0, 230, 118, 0.15) !important;
+        border-color: var(--accent-green) !important;
+        box-shadow: 0 2px 10px rgba(0, 230, 118, 0.25) !important;
+    }
+
+    div[data-testid="column"]:nth-child(2) div[data-testid="stButton"] button:not(:disabled) {
+        border-color: rgba(255, 160, 0, 0.4) !important;
+        color: var(--accent-amber) !important;
+    }
+    div[data-testid="column"]:nth-child(2) div[data-testid="stButton"] button:hover:not(:disabled) {
+        background-color: rgba(255, 160, 0, 0.15) !important;
+        border-color: var(--accent-amber) !important;
+        box-shadow: 0 2px 10px rgba(255, 160, 0, 0.25) !important;
+    }
+
+    div[data-testid="column"]:nth-child(3) div[data-testid="stButton"] button:not(:disabled) {
+        border-color: rgba(255, 82, 82, 0.4) !important;
+        color: var(--accent-red) !important;
+    }
+    div[data-testid="column"]:nth-child(3) div[data-testid="stButton"] button:hover:not(:disabled) {
+        background-color: rgba(255, 82, 82, 0.15) !important;
+        border-color: var(--accent-red) !important;
+        box-shadow: 0 2px 10px rgba(255, 82, 82, 0.25) !important;
+    }
+
+    /* Tabs Styling */
+    div[data-testid="stTabs"] button {
+        color: var(--text-secondary) !important;
+        font-weight: 600 !important;
+    }
+    div[data-testid="stTabs"] button[aria-selected="true"] {
+        color: var(--accent-cyan) !important;
+        border-bottom-color: var(--accent-cyan) !important;
+    }
+
+    /* Inputs, Selectboxes & Dropdowns */
+    div[data-baseweb="select"] > div {
+        background-color: var(--bg-surface) !important;
+        border-color: var(--border-subtle) !important;
+        color: var(--text-primary) !important;
+    }
+    div[data-baseweb="input"] input {
+        background-color: var(--bg-surface) !important;
+        color: var(--text-primary) !important;
     }
 </style>
 """,
@@ -83,10 +204,30 @@ st.write("Real-Time Vibration & Audio Stream Intelligence")
 st.markdown("---")
 
 
+# ===========================================================================
+# 🚀 PERFORMANCE LAYER: CACHED FILE I/O & OPTIMIZED DATA PIPELINE
+# ===========================================================================
+
+def _get_recordings_signature() -> str:
+    """Generate a lightweight signature of the recordings folder to invalidate cache only when files change."""
+    if not os.path.exists(DATA_DIR):
+        return "empty"
+    try:
+        files = sorted(os.listdir(DATA_DIR))
+        meta = []
+        for f in files:
+            if f.endswith((".csv", ".wav")):
+                p = os.path.join(DATA_DIR, f)
+                meta.append(f"{f}:{os.path.getmtime(p)}:{os.path.getsize(p)}")
+        return hashlib.md5("".join(meta).encode("utf-8")).hexdigest()
+    except Exception:
+        return str(time.time())
 
 
-# Helper function to generate ZIP archive of all stored recordings in order
-def generate_recordings_zip():
+@st.cache_data(show_spinner=False)
+def generate_recordings_zip(dir_signature: str) -> bytes:
+    """Cached generator for the recordings ZIP archive.
+    Recompresses ONLY when directory contents actually change on disk."""
     zip_buffer = io.BytesIO()
     if os.path.exists(DATA_DIR):
         raw_files = sorted(os.listdir(DATA_DIR))
@@ -94,9 +235,19 @@ def generate_recordings_zip():
             for fname in raw_files:
                 if fname.endswith(".csv") or fname.endswith(".wav"):
                     fpath = os.path.join(DATA_DIR, fname)
-                    zf.write(fpath, arcname=fname)
+                    if os.path.exists(fpath):
+                        zf.write(fpath, arcname=fname)
     zip_buffer.seek(0)
     return zip_buffer.getvalue()
+
+
+@st.cache_data(show_spinner=False, max_entries=30)
+def get_cached_file_bytes(file_path: str, mtime: float) -> bytes:
+    """Lazy cached binary reader for download buttons."""
+    if not os.path.exists(file_path):
+        return b""
+    with open(file_path, "rb") as f:
+        return f.read()
 
 
 # ==========================================
@@ -106,8 +257,8 @@ tab_live_ai, tab_records = st.tabs(
     ["📡 Live & Veena Diagnostics", "📁 Saved Records Explorer"]
 )
 
-LIVE_SYNC_SEC = 1.0 / 2.0  # Exactly  FPS telemetry sync bridge
-AI_REFRESH_SEC = 4.0  # Optimized to avoid UI stutter during live inference
+LIVE_SYNC_SEC = 1.0 / 2.0  # Telemetry sync bridge frequency (2 Hz)
+AI_REFRESH_SEC = 2.5  # Periodic refresh rate for AI diagnostic display
 
 # ==========================================
 # TAB 1: LIVE CONTROL, AI & TELEMETRY
@@ -152,7 +303,7 @@ with tab_live_ai:
 
     is_live = backend.state in ("RECORDING", "PAUSED", "STOPPING")
 
-    # --- INVISIBLE DATA BUS BRIDGE (LocalStorage Sync) ---
+    # --- INVISIBLE DATA BUS BRIDGE (LocalStorage Sync & State Transition Watcher) ---
     @st.fragment(run_every=LIVE_SYNC_SEC if is_live else None)
     def sync_telemetry_to_local_storage():
         current_state = backend.state
@@ -229,10 +380,25 @@ with tab_live_ai:
     <!DOCTYPE html>
     <html>
     <head>
+        <meta charset="utf-8">
         <style>
-            body { margin:0; background:transparent; font-family:Consolas, 'Courier New', monospace; }
-            .box { background-color:#161B22; border:1px solid #30363D; border-radius:6px; padding:10px 12px; text-align:center; box-sizing:border-box; transition: border-color 0.3s; }
-            .lab { color:#8B949E; font-weight:bold; font-size:11px; letter-spacing:1px; transition: color 0.3s; }
+            * { box-sizing: border-box; }
+            html, body { margin:0; padding:0; background:transparent; overflow:hidden; font-family:Consolas, 'Courier New', monospace; width:100%; height:100%; }
+            .box { 
+                background-color:#161B22; 
+                border:1px solid #30363D; 
+                border-radius:6px; 
+                padding:8px 12px; 
+                text-align:center; 
+                width:100%; 
+                height:68px; 
+                display:flex; 
+                flex-direction:column; 
+                justify-content:center; 
+                align-items:center;
+                transition: border-color 0.25s ease, box-shadow 0.25s ease; 
+            }
+            .lab { color:#8B949E; font-weight:bold; font-size:11px; letter-spacing:1px; transition: color 0.25s ease; }
             .val { color:#C9D1D9; font-size:26px; font-weight:bold; letter-spacing:2px; margin-top:2px; font-variant-numeric: tabular-nums; }
         </style>
     </head>
@@ -265,8 +431,8 @@ with tab_live_ai:
 
                 if (state === "PAUSED") {
                     anchorStartMs = null;
-                    box.style.borderColor = "#CCA000";
-                    lab.style.color = "#CCA000";
+                    box.style.borderColor = "#FFA000";
+                    lab.style.color = "#FFA000";
                     lab.textContent = "⏱️ PAUSED AT";
                     val.textContent = fmt(serverElapsed);
                 } else if (state === "STOPPING") {
@@ -276,11 +442,11 @@ with tab_live_ai:
                     lab.textContent = "⏱️ SAVING RECORDING...";
                     val.textContent = fmt(serverElapsed);
                 } else if (state === "RECORDING") {
-                    box.style.borderColor = "#00C853";
-                    lab.style.color = "#00C853";
+                    box.style.borderColor = "#00E676";
+                    lab.style.color = "#00E676";
                     lab.textContent = "⏱️ RECORDING TIME";
 
-                    const now = Date.now();
+                    const now = performance.now();
                     if (anchorStartMs === null) {
                         anchorStartMs = now - (serverElapsed * 1000);
                         maxDisplaySec = serverElapsed;
@@ -288,7 +454,7 @@ with tab_live_ai:
 
                     let calculatedSec = (now - anchorStartMs) / 1000.0;
 
-                    if (serverElapsed > calculatedSec + 2.0) {
+                    if (serverElapsed > calculatedSec + 1.5) {
                         anchorStartMs = now - (serverElapsed * 1000);
                         calculatedSec = serverElapsed;
                     }
@@ -308,45 +474,46 @@ with tab_live_ai:
                 }
             }
 
-            async function syncData() {
-                let synced = false;
+            function syncData() {
+                // 1. Read directly from localStorage (instant, synchronous)
+                try {
+                    const raw = localStorage.getItem('swarcare_status');
+                    if (raw) {
+                        const data = JSON.parse(raw);
+                        state = data.state;
+                        serverElapsed = data.elapsed_s;
+                    }
+                } catch(e) {}
+
+                // 2. Non-blocking sidecar HTTP probe
                 if (tryHttp && !fetchInFlight) {
                     fetchInFlight = true;
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 300);
+                    const timeoutId = setTimeout(() => controller.abort(), 250);
+                    let host = 'localhost';
                     try {
-                        const sidecarHost = (window.location && window.location.hostname) ? window.location.hostname : 'localhost';
-                        const res = await fetch('http://' + sidecarHost + ':7654/status', {cache: 'no-store', signal: controller.signal});
-                        if (res.ok) {
-                            const data = await res.json();
-                            state = data.state;
-                            serverElapsed = data.elapsed_s;
-                            synced = true;
-                        } else {
-                            tryHttp = false;
-                        }
-                    } catch(e) {
-                        tryHttp = false;
-                    } finally {
-                        clearTimeout(timeoutId);
-                        fetchInFlight = false;
-                    }
-                }
+                        if (window.parent && window.parent.location && window.parent.location.hostname) host = window.parent.location.hostname;
+                        else if (window.location && window.location.hostname) host = window.location.hostname;
+                    } catch(e){}
+                    if (!host) host = 'localhost';
 
-                if (!synced) {
-                    try {
-                        const raw = localStorage.getItem('swarcare_status');
-                        if (raw) {
-                            const data = JSON.parse(raw);
-                            state = data.state;
-                            serverElapsed = data.elapsed_s;
-                        }
-                    } catch(e) {}
+                    fetch('http://' + host + ':7654/status', {cache: 'no-store', signal: controller.signal})
+                        .then(res => res.ok ? res.json() : null)
+                        .then(data => {
+                            if (data) {
+                                state = data.state;
+                                serverElapsed = data.elapsed_s;
+                            }
+                        })
+                        .catch(() => {})
+                        .finally(() => {
+                            clearTimeout(timeoutId);
+                            fetchInFlight = false;
+                        });
                 }
-                updateUI();
             }
 
-            setInterval(syncData, 41);
+            setInterval(syncData, 100);
 
             function animLoop() {
                 updateUI();
@@ -358,7 +525,7 @@ with tab_live_ai:
     </body>
     </html>
     """
-    st.iframe(timer_static_html, height=76)
+    st.iframe(timer_static_html, height=72)
 
     st.markdown("---")
 
@@ -380,9 +547,9 @@ with tab_live_ai:
     render_status_banner()
     st.write("")
 
-    # --- 4. VEENA DIAGNOSTICS (Parallel: Physics Tuning + ML Quality) ---
-    st.subheader("🎹 Veena Diagnostics")
-    st.caption("Physics Pitch Engine + ML Structural Classifier run simultaneously in parallel.")
+    # --- 4. UNIFIED VEENA ANOMALY & DIAGNOSTIC MONITOR ---
+    st.subheader("🎯 Single Unified Anomaly & Diagnostic Monitor")
+    st.caption("Parallel Hybrid Architecture: Physics Pitch Engine (Tuning) + ML Structural Fault Classifier running simultaneously.")
 
     _TONIC_OPTIONS_UI = {
         "A1 (55 Hz)":   55.00,  "A#1 (58 Hz)":  58.27,  "B1 (62 Hz)":   61.74,
@@ -407,6 +574,23 @@ with tab_live_ai:
     }
     _STRING_KEYS = list(_STRING_OPTIONS.keys())
 
+    _STRUCTURAL_DEPTH_DESCRIPTIONS = {
+        -2: {"title": "Silence / System Idle", "summary": "No audio excitation detected. Waiting for musician to pluck a Veena string."},
+        -1: {"title": "Non-Veena Sound / Human Voice", "summary": "Acoustic signal analysis identified non-instrument sound (human speech, vocalization, or ambient noise). System requires genuine Saraswati Veena string resonance for diagnostic evaluation."},
+        0: {"title": "Structurally Sound & Resonant", "summary": "Instrument exhibits optimal acoustic resonance across the resonator (Kudam), bridge (Kudirai), and neck (Dandi). No structural damping detected."},
+        1: {"title": "Structurally Sound & Resonant", "summary": "Instrument exhibits optimal acoustic resonance across the resonator (Kudam), bridge (Kudirai), and neck (Dandi). No structural damping detected."},
+        2: {"title": "Fret Wear / Misalignment", "summary": "Bronze fret surface wear or loose fret fixing along the wax ledge (Melakku), causing non-linear buzz and fret contact impedance."},
+        3: {"title": "String Corrosion / Oxidation", "summary": "Surface oxidation and metal fatigue on steel/bronze core strings, altering linear mass density and harmonic purity."},
+        4: {"title": "Bridge Tilt / Kudirai Asymmetry", "summary": "Angular misalignment or uneven base contact of the main bridge (Kudirai) on the resonator soundboard plate."},
+        5: {"title": "Kudam Crack / Resonator Shell Fracture", "summary": "Structural hairline crack or wood joint separation in the Jackwood resonator shell (Kudam), causing internal cavity acoustic leakage."},
+        6: {"title": "Loose Peg / Birudai Slippage", "summary": "Taper pin friction failure in the tuning peg box (Birudai), causing continuous mechanical tension slippage under string load."},
+        7: {"title": "String Buzz / Jiva Thread Mismatch", "summary": "Improper contact angle between string and bridge curvature or damaged cotton/silk buzzing thread (Jiva/Javali)."},
+        8: {"title": "Sympathetic Resonance Dampening", "summary": "Acoustic damping in auxiliary drone resonators or wax wall structure, reducing sustain of unplucked resonant strings."},
+        9: {"title": "Finish Degradation / Shellac Flaking", "summary": "Degraded French polish / shellac coating on the wood body, affecting micro-porosity and ambient moisture protection."},
+        10: {"title": "Detached Bridge / Base Separation", "summary": "Partial adhesive separation between the bone/wood Kudirai base and the soundboard wood plate."},
+        11: {"title": "Nut Groove Wear / Meru Slit Wear", "summary": "Deepened or widened string guide grooves at the upper bridge (Meru), causing string rattling and open-string buzzing."},
+    }
+
     vcfg_col1, vcfg_col2 = st.columns(2)
     with vcfg_col1:
         _tonic_key = st.selectbox(
@@ -430,33 +614,36 @@ with tab_live_ai:
     @st.fragment(
         run_every=AI_REFRESH_SEC if backend.state == "RECORDING" else None
     )
-    def render_veena_diagnostics():
-        if os.path.exists(DATA_DIR):
+    def render_unified_anomaly_monitor():
+        # Identify the active or latest session
+        if backend.state in ("RECORDING", "PAUSED", "STOPPING") and backend.current_prefix:
+            _latest = backend.current_prefix
+        elif os.path.exists(DATA_DIR):
             _vfiles = [
                 f for f in os.listdir(DATA_DIR)
-                if f.endswith("_piezo.csv") or f.endswith("_audio.wav")
+                if f.endswith("_piezo.csv") or f.endswith("_audio.wav") or f.endswith("_audio.tmp")
             ]
             _all_rec = sorted(
-                {f.replace("_piezo.csv", "").replace("_audio.wav", "") for f in _vfiles},
+                {f.replace("_piezo.csv", "").replace("_audio.wav", "").replace("_audio.tmp", "") for f in _vfiles},
                 reverse=True,
             )
+            _latest = _all_rec[0] if _all_rec else None
         else:
-            _all_rec = []
+            _latest = None
 
-        if not _all_rec:
+        if not _latest:
             with st.container(border=True):
                 st.info(
-                    "💡 **Veena Engine Standing By:** Start recording and pluck a string to trigger diagnostics."
+                    "💡 **Anomaly Monitor Standing By:** Start recording and pluck a string to trigger real-time physics tuning and structural diagnostics."
                 )
             return
 
-        _latest = _all_rec[0]
         _vkey = f"veena_res_{_latest}_{veena_tonic_hz:.2f}_{veena_string_label}"
         _now = time.time()
 
         if (
             _vkey not in st.session_state
-            or (_now - st.session_state.get(f"{_vkey}_ts", 0)) > 3.5
+            or (_now - st.session_state.get(f"{_vkey}_ts", 0)) > 2.0
         ):
             st.session_state[_vkey] = backend.analyze_veena_ai(
                 _latest,
@@ -466,83 +653,130 @@ with tab_live_ai:
             )
             st.session_state[f"{_vkey}_ts"] = _now
 
-        vres = st.session_state[_vkey]
+        vres = st.session_state.get(_vkey, {})
 
         if not vres.get("available", False):
             with st.container(border=True):
-                st.warning(f"⏳ {vres.get('error', 'Veena engine not yet ready…')}")
+                st.warning(f"⏳ {vres.get('error', 'Diagnostic engine buffering audio…')}")
             return
 
-        tuning  = vres.get("tuning", {})
+        tuning = vres.get("tuning", {})
         quality = vres.get("quality", {})
-        is_healthy = vres.get("is_healthy", True)
-        overall    = vres.get("status", "Unknown")
+        is_healthy = vres.get("is_healthy", False)
+        is_veena = vres.get("is_veena", True)
+        sound_type = vres.get("sound_type", "Veena String Resonance")
+        master_status = vres.get("status", "Unknown")
+        
+        _tstat = tuning.get("status", "NO_PITCH")
+        _cdev = tuning.get("cents_dev", 0.0)
+        _f0 = tuning.get("f0_hz", 0.0)
+        _tgt = tuning.get("target_hz", 0.0)
+        _sname = tuning.get("string_name", "—")
+        _tmsg = tuning.get("message", "")
+        _tconf = tuning.get("confidence", 0.0)
 
-        if is_healthy:
-            st.success(f"✅ **{overall}** — Instrument is structurally sound.")
+        _qok = quality.get("is_healthy", False)
+        _qlabel = quality.get("label", "Healthy")
+        _qconf = quality.get("confidence", 0.0)
+        _qcls = quality.get("fault_class", 0)
+
+        # 1. Master Verdict Classification Banner
+        if master_status == "Silence" or _tstat == "SILENCE" or _qcls == -2:
+            st.info("⚪ **SYSTEM IDLE / SILENCE** — Waiting for audio input. Pluck a Saraswati Veena string to begin diagnostics.")
+        elif not is_veena or master_status == "Non-Veena Sound Detected" or _tstat == "NON_VEENA" or _qcls == -1:
+            st.error(f"🚨 **ANOMALY DETECTED — {_qlabel.upper()}** (Acoustic signature does not match Saraswati Veena string).")
+        elif is_healthy and _tstat == "IN_TUNE":
+            st.success("🟢 **HEALTHY & IN TUNE** — Instrument is structurally sound and tuned accurately within ±15 cents.")
+        elif is_healthy and _tstat in ["FLAT", "SHARP"]:
+            st.warning(f"🟡 **HEALTHY (TUNING WATCH: {_tstat})** — Instrument structure is sound, but string is {_tstat} by {abs(_cdev):.1f} cents.")
+        elif not is_healthy and _qcls > 1:
+            st.error(f"🚨 **ANOMALY DETECTED — {_qlabel.upper()}** (Structural defect identified by ML Classifier).")
+        elif not is_healthy and _tstat in ["FLAT", "SHARP"]:
+            st.warning(f"🟡 **TUNING MISALIGNMENT: {_tstat}** — String pitch is {_tstat} by {abs(_cdev):.1f} cents.")
+        elif not is_healthy and _tstat == "NO_PITCH":
+            st.warning("⏳ **ACOUSTIC DAMPENING / NO PITCH** — Unclear fundamental string pitch detected.")
         else:
-            st.error(f"🚨 **{overall}** — Structural issue detected.")
+            st.info("ℹ️ **DIAGNOSTIC ACTIVE** — Analyzing resonance and tuning...")
 
-        vc1, vc2 = st.columns(2)
-        with vc1:
-            with st.container(border=True):
-                st.markdown("**🎯 Tuning (Physics Engine)**")
-                if not tuning.get("available", False):
-                    st.warning(tuning.get("error", "Not available."))
+        # 2. Key Metrics Row
+        with st.container(border=True):
+            mc1, mc2, mc3 = st.columns(3)
+            with mc1:
+                if master_status == "Silence" or _qcls == -2:
+                    _badge = "🔇 Silence / Idle"
+                    _delta = "No Input"
+                    _dcolor = "off"
+                elif not is_veena or _qcls == -1:
+                    _badge = f"🚨 {_qlabel}"
+                    _delta = "Non-Veena Anomaly"
+                    _dcolor = "inverse"
                 else:
-                    _STATUS_EMOJI = {
-                        "IN_TUNE": "✅", "FLAT": "⬇️", "SHARP": "⬆️",
-                        "NO_PITCH": "🔇", "SILENCE": "🟤",
-                    }
-                    _tstat  = tuning.get("status", "NO_PITCH")
-                    _cdev   = tuning.get("cents_dev", 0.0)
-                    _f0     = tuning.get("f0_hz", 0.0)
-                    _tgt    = tuning.get("target_hz", 0.0)
-                    _sname  = tuning.get("string_name", "—")
-                    _msg    = tuning.get("message", "")
-                    st.metric(
-                        label=f"String: {_sname}",
-                        value=f"{_STATUS_EMOJI.get(_tstat, '?')} {_tstat}",
-                        delta=f"{_cdev:+.1f} cents",
-                        delta_color="normal" if _tstat == "IN_TUNE" else "inverse",
-                    )
-                    st.progress(
-                        max(0.0, min(1.0, (_cdev + 50) / 100.0)),
-                        text=f"Detected: {_f0:.2f} Hz │ Target: {_tgt:.2f} Hz",
-                    )
-                    if _msg:
-                        st.caption(f"📌 {_msg}")
-                    st.caption(
-                        f"Method: `{tuning.get('method', 'n/a')}` │ "
-                        f"pYIN confidence: **{tuning.get('confidence', 0):.2f}**"
-                    )
-        with vc2:
-            with st.container(border=True):
-                st.markdown("**🧠 Structural Quality (ML)**")
-                if not quality.get("available", False):
-                    st.warning(quality.get("error", "Not available."))
-                else:
-                    _qok    = quality.get("is_healthy", True)
-                    _qlabel = quality.get("label", "Unknown")
-                    _qconf  = quality.get("confidence", 0.0)
-                    _qcls   = quality.get("fault_class", -1)
-                    _badge  = "✅ Healthy" if _qok else f"🚨 {_qlabel}"
-                    st.metric(
-                        label="Fault Classification",
-                        value=_badge,
-                        delta=f"{_qconf:.1f}% confidence",
-                        delta_color="normal" if _qok else "inverse",
-                    )
-                    st.progress(
-                        min(1.0, _qconf / 100.0),
-                        text=f"Class {_qcls} — {_qlabel}",
-                    )
-                    st.caption(
-                        f"Inference: **{quality.get('timing_ms', '?')} ms** │ "
-                        "YAMNet + Energy Decay + HF Flatness"
-                    )
+                    _badge = "✅ Healthy" if is_healthy else f"🚨 {_qlabel}"
+                    _delta = f"{_qconf:.1f}% confidence" if _qconf > 0 else "Active"
+                    _dcolor = "normal" if is_healthy else "inverse"
 
-        # Reference Hz table
+                st.metric(
+                    label="Overall Health Status",
+                    value=_badge,
+                    delta=_delta,
+                    delta_color=_dcolor,
+                )
+            with mc2:
+                _STATUS_EMOJI = {
+                    "IN_TUNE": "✅", "FLAT": "⬇️", "SHARP": "⬆️",
+                    "NO_PITCH": "🔇", "SILENCE": "🟤", "NON_VEENA": "🚫",
+                }
+                if not is_veena or _tstat == "NON_VEENA":
+                    _t_label = "🚫 Non-Veena"
+                    _t_delta = "Non-instrument sound"
+                    _t_dcolor = "inverse"
+                elif _tstat == "SILENCE":
+                    _t_label = "🔇 Silence"
+                    _t_delta = "No pitch"
+                    _t_dcolor = "off"
+                else:
+                    _t_label = f"{_STATUS_EMOJI.get(_tstat, '?')} {_tstat}"
+                    _t_delta = f"{_cdev:+.1f} cents" if _f0 > 0 else "No pitch"
+                    _t_dcolor = "normal" if _tstat == "IN_TUNE" else "inverse"
+
+                st.metric(
+                    label=f"Tuning ({_sname})",
+                    value=_t_label,
+                    delta=_t_delta,
+                    delta_color=_t_dcolor,
+                )
+            with mc3:
+                _depth_entry = _STRUCTURAL_DEPTH_DESCRIPTIONS.get(_qcls, {"title": _qlabel, "summary": ""})
+                st.metric(
+                    label="Identified Anomaly / Defect",
+                    value=_depth_entry["title"],
+                    delta=f"Class {_qcls}" if _qcls >= 0 else "Sound Validation",
+                    delta_color="normal" if is_healthy else ("off" if _qcls == -2 else "inverse"),
+                )
+
+            # High-Precision Responsive Tuning Gauge
+            if is_veena and _f0 > 0 and _tgt > 0:
+                clamped_progress = max(0.0, min(1.0, (_cdev + 50.0) / 100.0))
+                st.progress(
+                    clamped_progress,
+                    text=f"Detected: {_f0:.1f} Hz │ Target: {_tgt:.1f} Hz │ Dev: {_cdev:+.1f} cents (Target: ±15 cents)",
+                )
+            elif not is_veena:
+                st.progress(
+                    0.0,
+                    text=f"Non-Veena Acoustic Event ({sound_type}) │ Requires genuine Veena string excitation",
+                )
+            if _tmsg:
+                st.caption(f"📌 **Tuning Guide:** {_tmsg}")
+
+        # 3. Structural Depth (What Could Be The Anomaly)
+        _depth_info = _STRUCTURAL_DEPTH_DESCRIPTIONS.get(_qcls, {"title": _qlabel, "summary": "Structural analysis performed via YAMNet embeddings."})
+        with st.container(border=True):
+            st.markdown(f"**🔬 Structural Issues Depth:** `{_depth_info['title']}`")
+            st.write(_depth_info["summary"])
+            st.caption(f"Evaluated Target Session: `📄 {_latest}` │ Sound Type: **{sound_type}** │ Feature Vector: **527-D Parallel Hybrid**")
+
+        # 4. Expandable Reference & Diagnostic Report
         with st.expander("🎷 String Reference Hz — all 7 strings at current tonic"):
             _rz = {
                 "S1 Sarani":    round(veena_tonic_hz * 2.0,  2),
@@ -562,86 +796,10 @@ with tab_live_ai:
                     if i + 4 < len(items):
                         col.metric(items[i + 4][0], f"{items[i + 4][1]} Hz")
 
-        with st.expander("🔍 Full Diagnostic Report (Raw JSON)"):
+        with st.expander("🔍 Full Diagnostic Telemetry Report (Raw JSON)"):
             st.json(vres)
 
-    render_veena_diagnostics()
-    st.markdown("---")
-
-    st.subheader("🧠 Real-Time AI Diagnostic & Anomaly Center")
-
-    @st.fragment(
-        run_every=AI_REFRESH_SEC if backend.state == "RECORDING" else None
-    )
-    def render_ai_diagnostics():
-        if os.path.exists(DATA_DIR):
-            valid_files = [
-                f
-                for f in os.listdir(DATA_DIR)
-                if f.endswith("_piezo.csv") or f.endswith("_audio.wav")
-            ]
-            all_recordings = sorted(
-                [
-                    f.replace("_piezo.csv", "").replace("_audio.wav", "")
-                    for f in valid_files
-                ],
-                reverse=True,
-            )
-            unique_prefixes = sorted(list(set(all_recordings)), reverse=True)
-        else:
-            unique_prefixes = []
-
-        if unique_prefixes:
-            latest_prefix = unique_prefixes[0]
-
-            # Non-blocking state cache for AI inference
-            cache_key = f"ai_res_{latest_prefix}"
-            now_time = time.time()
-
-            if (
-                cache_key not in st.session_state
-                or (now_time - st.session_state.get(f"{cache_key}_ts", 0)) > 3.5
-            ):
-                st.session_state[cache_key] = backend.analyze_recording_ai(
-                    latest_prefix
-                )
-                st.session_state[f"{cache_key}_ts"] = now_time
-
-            ai_results = st.session_state[cache_key]
-
-            with st.container(border=True):
-                col_ai1, col_ai2, col_ai3 = st.columns(3)
-
-                status_color_text = ai_results.get("status", "UNKNOWN")
-                with col_ai1:
-                    st.markdown(
-                        f"**Diagnostic Status**\n### {status_color_text}"
-                    )
-                with col_ai2:
-                    score = ai_results.get("score", 0.0)
-                    st.metric("Anomaly Score (0-1)", f"{score:.3f}")
-                    st.progress(min(1.0, max(0.0, score)))
-                with col_ai3:
-                    conf = ai_results.get("confidence", 0)
-                    st.metric("Confidence Level", f"{conf}%")
-                    st.progress(min(1.0, max(0.0, conf / 100.0)))
-
-                st.caption(f"Target Session Evaluated: `📄 {latest_prefix}`")
-
-                with st.expander(
-                    "🔍 Expand Full AI Diagnostic Report & Telemetry Metrics"
-                ):
-                    st.json(ai_results)
-        else:
-            with st.container(border=True):
-                st.info(
-                    "💡 **AI Engine Standing By:** Record a session using the"
-                    " control deck above to trigger background feature"
-                    " extraction and live classification."
-                )
-
-    render_ai_diagnostics()
-
+    render_unified_anomaly_monitor()
     st.markdown("---")
 
     # --- 5. DUAL TELEMETRY MONITOR STATIONS ---
@@ -653,29 +811,41 @@ with tab_live_ai:
     <!DOCTYPE html>
     <html>
     <head>
+        <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            body { margin:0; background-color:#0E1117; overflow:hidden; font-family:Consolas, 'Courier New', monospace; }
+            * { box-sizing: border-box; }
+            html, body { margin:0; padding:0; background-color:#0E1117; overflow:hidden; font-family:Consolas, 'Courier New', monospace; width:100%; height:100%; }
             .terminal-box {
                 background-color:#161B22;
                 border:1px solid #30363D;
                 border-radius:6px;
-                height:190px;
-                padding:6px 6px;
-                box-sizing:border-box;
+                height:100%;
+                width:100%;
+                padding:8px;
                 overflow-y:auto;
-                overflow-x:auto;
-                font-size: clamp(9.5px, 2.6vw, 11.8px);
-                letter-spacing: -0.35px;
+                overflow-x:hidden;
+                font-size: clamp(9.5px, 2.5vw, 11.5px);
+                letter-spacing: -0.3px;
                 font-variant-numeric: tabular-nums;
-                white-space: nowrap;
-                transition: border-color 0.3s;
+                white-space: pre-wrap;
+                word-break: break-all;
+                transition: border-color 0.25s ease;
+            }
+            .idle-wrap {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                color: #8B949E;
+                font-size: 12px;
+                text-align: center;
             }
         </style>
     </head>
     <body>
         <div id="term-box" class="terminal-box">
-            <div style="color:#8B949E; padding-top:80px; text-align:center; font-size:12px;">--- SERIAL MONITOR PIPELINE IDLE ---</div>
+            <div class="idle-wrap">--- SERIAL MONITOR PIPELINE IDLE ---</div>
         </div>
         <script>
             let lastSecBlock = null;
@@ -683,6 +853,7 @@ with tab_live_ai:
             let pRate = 2000;
             let tryHttp = true;
             let fetchInFlight = false;
+            let lastRenderedSignature = "";
 
             function parseSec(txt, idx) {
                 const hhmmss = txt.match(/(?:TIME|T)\\s*:\\s*(\\d{1,2}):(\\d{2}):([\\d.]+)/i);
@@ -698,15 +869,23 @@ with tab_live_ai:
                 const box = document.getElementById('term-box');
                 if (!box) return;
 
-                if (state === "RECORDING") box.style.borderColor = "#00C853";
-                else if (state === "PAUSED") box.style.borderColor = "#CCA000";
+                if (state === "RECORDING") box.style.borderColor = "#00E676";
+                else if (state === "PAUSED") box.style.borderColor = "#FFA000";
                 else if (state === "STOPPING") box.style.borderColor = "#00BCD4";
                 else box.style.borderColor = "#30363D";
 
                 if (!linesData || linesData.length === 0) {
-                    box.innerHTML = '<div style="color:#8B949E; padding-top:80px; text-align:center; font-size:12px;">--- SERIAL MONITOR PIPELINE IDLE ---</div>';
+                    if (lastRenderedSignature !== "IDLE") {
+                        box.innerHTML = '<div class="idle-wrap">--- SERIAL MONITOR PIPELINE IDLE ---</div>';
+                        lastRenderedSignature = "IDLE";
+                    }
                     return;
                 }
+
+                // Fast signature check to avoid DOM thrashing if lines have not changed
+                const currentSig = linesData.map(l => (l.text || '') + (l.active ? '1' : '0')).join('|');
+                if (currentSig === lastRenderedSignature) return;
+                lastRenderedSignature = currentSig;
 
                 let html = "";
                 lastSecBlock = null;
@@ -723,7 +902,7 @@ with tab_live_ai:
                     let secBlock = Math.floor(secVal / 2) * 2;
                     if (lastSecBlock !== null && secBlock !== lastSecBlock) {
                         let relSec = Math.floor((secVal - baseTimeSec) / 2) * 2;
-                        html += `<div style="border-top: 2px dotted #00BCD4; background: rgba(0, 188, 212, 0.12); color: #00BCD4; text-align: center; font-size: 10px; margin: 5px 0; padding: 2px 0; font-weight: bold; letter-spacing: 0.5px;">⏱️ ┈┈┈┈┈ 2s MARKER (+${relSec}s) ┈┈┈┈┈</div>`;
+                        html += `<div style="border-top: 1px dotted #00BCD4; background: rgba(0, 188, 212, 0.08); color: #00BCD4; text-align: center; font-size: 9.5px; margin: 4px 0; padding: 2px 0; font-weight: bold; letter-spacing: 0.5px;">⏱️ ┈┈ 2s MARKER (+${relSec}s) ┈┈</div>`;
                     }
                     lastSecBlock = secBlock;
 
@@ -735,52 +914,58 @@ with tab_live_ai:
                 box.scrollTop = box.scrollHeight;
             }
 
-            async function syncTerminal() {
+            function syncTerminal() {
                 let linesData = null;
                 let state = "STOPPED";
 
+                // 1. Read from localStorage directly (fast & synchronous)
+                try {
+                    const raw = localStorage.getItem('swarcare_piezo');
+                    if (raw) {
+                        const data = JSON.parse(raw);
+                        linesData = data.lines;
+                        state = data.state;
+                    }
+                } catch(e) {}
+
+                // 2. Non-blocking sidecar HTTP probe
                 if (tryHttp && !fetchInFlight) {
                     fetchInFlight = true;
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 300);
+                    const timeoutId = setTimeout(() => controller.abort(), 250);
+                    let host = 'localhost';
                     try {
-                        const sidecarHost = (window.location && window.location.hostname) ? window.location.hostname : 'localhost';
-                        const res = await fetch('http://' + sidecarHost + ':7654/piezo_lines', {cache: 'no-store', signal: controller.signal});
-                        if (res.ok) {
-                            const data = await res.json();
-                            linesData = data.lines;
-                            state = data.state;
-                        } else {
-                            tryHttp = false;
-                        }
-                    } catch(e) {
-                        tryHttp = false;
-                    } finally {
-                        clearTimeout(timeoutId);
-                        fetchInFlight = false;
-                    }
+                        if (window.parent && window.parent.location && window.parent.location.hostname) host = window.parent.location.hostname;
+                        else if (window.location && window.location.hostname) host = window.location.hostname;
+                    } catch(e){}
+                    if (!host) host = 'localhost';
+
+                    fetch('http://' + host + ':7654/piezo_lines', {cache: 'no-store', signal: controller.signal})
+                        .then(res => res.ok ? res.json() : null)
+                        .then(data => {
+                            if (data && data.lines) {
+                                renderLines(data.lines, data.state);
+                            }
+                        })
+                        .catch(() => {})
+                        .finally(() => {
+                            clearTimeout(timeoutId);
+                            fetchInFlight = false;
+                        });
                 }
 
-                if (!linesData) {
-                    try {
-                        const raw = localStorage.getItem('swarcare_piezo');
-                        if (raw) {
-                            const data = JSON.parse(raw);
-                            linesData = data.lines;
-                            state = data.state;
-                        }
-                    } catch(e) {}
+                if (linesData) {
+                    renderLines(linesData, state);
                 }
-                renderLines(linesData, state);
             }
 
-            setInterval(syncTerminal, 200);
+            setInterval(syncTerminal, 180);
             syncTerminal();
         </script>
     </body>
     </html>
     """
-    st.iframe(terminal_static_html, height=200)
+    st.iframe(terminal_static_html, height=195)
     st.write("")
 
     # B. AUDIO LIVE MONITOR (USB Microphone - 24 FPS Oscilloscope)
@@ -790,10 +975,12 @@ with tab_live_ai:
     <!DOCTYPE html>
     <html>
     <head>
+        <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            body { margin:0; background-color:#0E1117; overflow:hidden; }
-            #aC { display:block; background:#161B22; border-radius:6px; border:1px solid #30363D; width:100%; height:200px; }
+            * { box-sizing: border-box; }
+            html, body { margin:0; padding:0; background-color:#0E1117; overflow:hidden; width:100%; height:100%; }
+            #aC { display:block; background:#161B22; border-radius:6px; border:1px solid #30363D; width:100%; height:100%; }
         </style>
     </head>
     <body>
@@ -806,10 +993,11 @@ with tab_live_ai:
                 function updateCanvasDimensions() {
                     const dpr = window.devicePixelRatio || 1;
                     const containerWidth = window.innerWidth || 360;
+                    const containerHeight = window.innerHeight || 200;
                     canvas.width = containerWidth * dpr;
-                    canvas.height = 200 * dpr;
-                    ctx.scale(dpr, dpr);
-                    return { w: containerWidth, h: 200 };
+                    canvas.height = containerHeight * dpr;
+                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                    return { w: containerWidth, h: containerHeight };
                 }
 
                 let dims = updateCanvasDimensions();
@@ -829,44 +1017,48 @@ with tab_live_ai:
                 const frameIntervalMs = 1000 / targetFPS;
                 let lastRenderMs = performance.now();
 
-                async function fetchAudioData() {
-                    let synced = false;
+                function fetchAudioData() {
+                    // 1. Read from localStorage directly (fast & synchronous)
+                    try {
+                        const raw = localStorage.getItem('swarcare_audio');
+                        if (raw) {
+                            const data = JSON.parse(raw);
+                            if (data.samples && data.samples.length > 0) {
+                                history = data.samples;
+                            }
+                            serverTimeSec = data.elapsed_s || 0.0;
+                            state = data.state || "STOPPED";
+                            lastFetchMs = performance.now();
+                        }
+                    } catch(e) {}
+
+                    // 2. Non-blocking sidecar HTTP probe
                     if (tryHttp && !fetchInFlight) {
                         fetchInFlight = true;
                         const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 300);
+                        const timeoutId = setTimeout(() => controller.abort(), 250);
+                        let host = 'localhost';
                         try {
-                            const sidecarHost = (window.location && window.location.hostname) ? window.location.hostname : 'localhost';
-                        const res = await fetch('http://' + sidecarHost + ':7654/audio_data', {cache: 'no-store', signal: controller.signal});
-                            if (res.ok) {
-                                const data = await res.json();
-                                history = data.samples || [];
-                                serverTimeSec = data.elapsed_s || 0.0;
-                                state = data.state || "STOPPED";
-                                lastFetchMs = performance.now();
-                                synced = true;
-                            } else {
-                                tryHttp = false;
-                            }
-                        } catch(e) {
-                            tryHttp = false;
-                        } finally {
-                            clearTimeout(timeoutId);
-                            fetchInFlight = false;
-                        }
-                    }
+                            if (window.parent && window.parent.location && window.parent.location.hostname) host = window.parent.location.hostname;
+                            else if (window.location && window.location.hostname) host = window.location.hostname;
+                        } catch(e){}
+                        if (!host) host = 'localhost';
 
-                    if (!synced) {
-                        try {
-                            const raw = localStorage.getItem('swarcare_audio');
-                            if (raw) {
-                                const data = JSON.parse(raw);
-                                history = data.samples || [];
-                                serverTimeSec = data.elapsed_s || 0.0;
-                                state = data.state || "STOPPED";
-                                lastFetchMs = performance.now();
-                            }
-                        } catch(e) {}
+                        fetch('http://' + host + ':7654/audio_data', {cache: 'no-store', signal: controller.signal})
+                            .then(res => res.ok ? res.json() : null)
+                            .then(data => {
+                                if (data && data.samples && data.samples.length > 0) {
+                                    history = data.samples;
+                                    serverTimeSec = data.elapsed_s || 0.0;
+                                    state = data.state || "STOPPED";
+                                    lastFetchMs = performance.now();
+                                }
+                            })
+                            .catch(() => {})
+                            .finally(() => {
+                                clearTimeout(timeoutId);
+                                fetchInFlight = false;
+                            });
                     }
                 }
 
@@ -876,7 +1068,6 @@ with tab_live_ai:
                     const h = canvas.height / dpr;
 
                     const nowMs = performance.now();
-                    const dt = Math.min(0.1, (nowMs - lastFrameMs) / 1000.0);
                     lastFrameMs = nowMs;
 
                     if (state === "RECORDING") {
@@ -884,16 +1075,16 @@ with tab_live_ai:
                         if (displayTimeSec === 0 || Math.abs(displayTimeSec - targetTimeSec) > 1.0) {
                             displayTimeSec = targetTimeSec;
                         } else {
-                            displayTimeSec += (targetTimeSec - displayTimeSec) * 0.2;
+                            displayTimeSec += (targetTimeSec - displayTimeSec) * 0.25;
                         }
                     } else {
                         displayTimeSec = serverTimeSec;
                     }
 
                     const isMobile = w < 480;
-                    const padLeft = isMobile ? 48 : 65;
-                    const padBottom = isMobile ? 32 : 35;
-                    const padTop = 20;
+                    const padLeft = isMobile ? 56 : 68;
+                    const padBottom = isMobile ? 28 : 32;
+                    const padTop = 18;
                     const padRight = isMobile ? 12 : 20;
 
                     const plotW = Math.max(10, w - padLeft - padRight);
@@ -914,7 +1105,7 @@ with tab_live_ai:
                     ctx.lineWidth = 1.5;
                     ctx.strokeRect(padLeft, padTop, plotW, plotH);
 
-                    ctx.setLineDash([4, 4]);
+                    ctx.setLineDash([3, 3]);
                     ctx.strokeStyle = '#8B949E';
                     ctx.beginPath(); ctx.moveTo(padLeft, midY); ctx.lineTo(w - padRight, midY); ctx.stroke();
                     ctx.setLineDash([]);
@@ -923,13 +1114,13 @@ with tab_live_ai:
                     ctx.font = isMobile ? '8.5px monospace' : '10px monospace';
                     ctx.textAlign = 'right';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText('+1.0', padLeft - 4, padTop);
-                    ctx.fillText('0.0', padLeft - 4, midY);
-                    ctx.fillText('-1.0', padLeft - 4, h - padBottom);
+                    ctx.fillText('+1.0', padLeft - 6, padTop);
+                    ctx.fillText('0.0', padLeft - 6, midY);
+                    ctx.fillText('-1.0', padLeft - 6, padTop + plotH);
 
                     const N = history.length;
-                    if(N > 0) {
-                        ctx.fillStyle = '#00E676';
+                    if(N > 0 && state !== "STOPPED") {
+                        ctx.fillStyle = state === "RECORDING" ? '#00E676' : '#FFA000';
                         const barWidth = isMobile ? 1.5 : 2.0;
 
                         for (let col = 0; col < plotW; col += barWidth) {
@@ -938,18 +1129,29 @@ with tab_live_ai:
                             if (sampleIdx >= N) sampleIdx = N - 1;
 
                             let amplitude = Math.abs(history[sampleIdx]);
-                            let barHeight = Math.max(2, amplitude * (plotH * 0.85));
+                            let barHeight = Math.max(2, amplitude * (plotH * 0.88));
+                            ctx.fillRect(x, midY - (barHeight / 2), barWidth, barHeight);
+                        }
+                    } else if (N > 0 && state === "STOPPED") {
+                        ctx.fillStyle = '#8B949E';
+                        const barWidth = isMobile ? 1.5 : 2.0;
+                        for (let col = 0; col < plotW; col += barWidth) {
+                            let x = padLeft + col;
+                            let sampleIdx = Math.floor((col / plotW) * N);
+                            if (sampleIdx >= N) sampleIdx = N - 1;
+                            let amplitude = Math.abs(history[sampleIdx]);
+                            let barHeight = Math.max(2, amplitude * (plotH * 0.88));
                             ctx.fillRect(x, midY - (barHeight / 2), barWidth, barHeight);
                         }
                     } else {
                         ctx.fillStyle = '#8B949E';
-                        ctx.font = isMobile ? '11px monospace' : '12px monospace';
+                        ctx.font = isMobile ? '10px monospace' : '11.5px monospace';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText('--- AUDIO MONITOR IDLE ---', padLeft + plotW / 2, midY);
                     }
 
-                    // Smooth 2-second time markers
+                    // Clean 2-second time markers
                     const pixelsPerSec = plotW / visibleWindowSec;
                     const start2sMarker = Math.floor(Math.max(0, displayTimeSec - visibleWindowSec) / 2.0) * 2.0;
                     const end2sMarker = displayTimeSec + 2.0;
@@ -960,45 +1162,45 @@ with tab_live_ai:
 
                         if (markX >= padLeft && markX <= (w - padRight)) {
                             ctx.save();
-                            ctx.setLineDash([3, 3]);
+                            ctx.setLineDash([2, 2]);
                             ctx.strokeStyle = '#00BCD4';
-                            ctx.lineWidth = 1.2;
+                            ctx.lineWidth = 1;
                             ctx.beginPath();
                             ctx.moveTo(markX, padTop);
-                            ctx.lineTo(markX, h - padBottom);
+                            ctx.lineTo(markX, padTop + plotH);
                             ctx.stroke();
                             ctx.restore();
 
                             ctx.fillStyle = '#00BCD4';
-                            ctx.font = isMobile ? 'bold 8.5px monospace' : 'bold 10px monospace';
+                            ctx.font = isMobile ? 'bold 8px monospace' : 'bold 9.5px monospace';
                             ctx.textAlign = 'center';
                             ctx.textBaseline = 'bottom';
                             ctx.fillText(tMark.toFixed(1) + 's', markX, padTop - 2);
 
                             ctx.fillStyle = '#C9D1D9';
                             ctx.textBaseline = 'top';
-                            ctx.fillText(tMark.toFixed(1) + 's', markX, h - padBottom + 4);
+                            ctx.fillText(tMark.toFixed(1) + 's', markX, padTop + plotH + 3);
                         }
                     }
 
                     ctx.fillStyle = '#8B949E';
-                    ctx.font = isMobile ? 'bold 10px monospace' : 'bold 11px monospace';
+                    ctx.font = isMobile ? 'bold 9.5px monospace' : 'bold 11px monospace';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'top';
-                    ctx.fillText('Time', padLeft + plotW / 2, h - 14);
+                    ctx.fillText('Time', padLeft + plotW / 2, h - 12);
 
                     ctx.save();
-                    ctx.translate(isMobile ? 12 : 16, padTop + plotH / 2);
+                    ctx.translate(isMobile ? 12 : 14, padTop + plotH / 2);
                     ctx.rotate(-Math.PI / 2);
                     ctx.fillStyle = '#C9D1D9';
-                    ctx.font = isMobile ? 'bold 9.5px monospace' : 'bold 12px monospace';
+                    ctx.font = isMobile ? 'bold 9px monospace' : 'bold 11px monospace';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText('Normalised Amplitude', 0, 0);
                     ctx.restore();
                 }
 
-                setInterval(fetchAudioData, 200);
+                setInterval(fetchAudioData, 180);
 
                 function anim(nowMs) {
                     requestAnimationFrame(anim);
@@ -1014,7 +1216,7 @@ with tab_live_ai:
     </body>
     </html>
     """
-    st.iframe(audio_static_html, height=210)
+    st.iframe(audio_static_html, height=205)
     st.markdown("---")
 
     # C. SYNCHRONIZED STORAGE METRICS PANEL
@@ -1052,9 +1254,10 @@ with tab_records:
     else:
         csv_files, wav_files = [], []
 
-    # --- FEATURE 2: DOWNLOAD ALL AS ZIP ARCHIVE ---
+    # --- FEATURE 2: DOWNLOAD ALL AS ZIP ARCHIVE (HIGH PERFORMANCE CACHED) ---
     if csv_files or wav_files:
-        zip_bytes = generate_recordings_zip()
+        dir_sig = _get_recordings_signature()
+        zip_bytes = generate_recordings_zip(dir_sig)
         ts_now = datetime.now().strftime("%Y%m%d_%H%M%S")
         zip_filename = f"SwarCare_All_Recordings_{ts_now}.zip"
 
@@ -1106,8 +1309,8 @@ with tab_records:
 
                     btn_col1, btn_col2, btn_col3 = st.columns([2, 1, 1])
                     with btn_col1:
-                        with open(file_path, "rb") as f:
-                            file_data = f.read()
+                        file_mtime = os.path.getmtime(file_path)
+                        file_data = get_cached_file_bytes(file_path, file_mtime)
                         st.download_button(
                             label="📥 CSV",
                             data=file_data,
@@ -1130,7 +1333,7 @@ with tab_records:
                                     st.toast(
                                         f"Renamed to {target_name}!", icon="✏️"
                                     )
-                                    time.sleep(0.2)
+                                    time.sleep(0.1)
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Error: {e}")
@@ -1144,10 +1347,10 @@ with tab_records:
                             try:
                                 os.remove(file_path)
                                 st.toast(f"Removed {file}!", icon="🗑️")
-                                time.sleep(0.2)
+                                time.sleep(0.1)
                                 st.rerun()
                             except Exception as e:
-                                st.error(f"Error: {e}")
+                                f"Error: {e}"
 
     # --- RIGHT COLUMN: .wav Files ---
     with col_wav:
@@ -1182,8 +1385,8 @@ with tab_records:
 
                     btn_col1, btn_col2, btn_col3 = st.columns([2, 1, 1])
                     with btn_col1:
-                        with open(file_path, "rb") as f:
-                            wav_data = f.read()
+                        wav_mtime = os.path.getmtime(file_path)
+                        wav_data = get_cached_file_bytes(file_path, wav_mtime)
                         st.download_button(
                             label="📥 WAV",
                             data=wav_data,
@@ -1207,7 +1410,7 @@ with tab_records:
                                         f"Renamed to {target_wav_name}!",
                                         icon="✏️",
                                     )
-                                    time.sleep(0.2)
+                                    time.sleep(0.1)
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Error: {e}")
@@ -1221,7 +1424,7 @@ with tab_records:
                             try:
                                 os.remove(file_path)
                                 st.toast(f"Removed {file}!", icon="🗑️")
-                                time.sleep(0.2)
+                                time.sleep(0.1)
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Error: {e}")
@@ -1266,5 +1469,5 @@ with tab_records:
                         pass
             st.session_state.visible_records_limit = 3
             st.toast("Storage directory wiped clean!", icon="💥")
-            time.sleep(0.3)
+            time.sleep(0.2)
             st.rerun()

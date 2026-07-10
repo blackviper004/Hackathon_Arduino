@@ -249,6 +249,17 @@ class PhysicsPitchEngine:
                 method=method,
             )
 
+        # ── Stage 3.5: String Harmonicity Check ─────────────────────────────
+        is_string_like, harm_msg = self._validate_string_harmonicity(audio, sr, f0_final)
+        if not is_string_like:
+            return PitchResult(
+                status="NO_PITCH",
+                f0_hz=round(f0_final, 2),
+                confidence=round(confidence, 3),
+                message=harm_msg,
+                method=method,
+            )
+
         # ── Stage 4: Cents Rule Engine ───────────────────────────────────────
         return self._cents_decision(f0_final, confidence, method)
 
@@ -296,9 +307,92 @@ class PhysicsPitchEngine:
         f0, conf, _ = self._sruti_aware_pyin(audio_lifted, sr, f0_hps)
         return f0, conf
 
-    def string_targets(self) -> Dict[str, float]:
-        """Return all 7 string target frequencies (S1-S4/T1-T3) for the current tonic."""
-        return dict(self._string_targets)
+    def _validate_string_harmonicity(self, audio: np.ndarray, sr: int, f0: float) -> Tuple[bool, str]:
+        """
+        Validate whether the detected pitch corresponds to a genuine plucked string
+        acoustic harmonic comb or non-Veena acoustic events (human voice, noise).
+        """
+        if f0 <= 30.0 or f0 > 1500.0:
+            return False, "Detected pitch is outside physical Veena string range (45–1100 Hz)."
+
+        # Extract strongest 1.0-second active pluck/vibration window
+        win_len = int(1.0 * sr)
+        if len(audio) > win_len:
+            hop = int(0.10 * sr)
+            max_win_rms = 0.0
+            best_st = 0
+            for st in range(0, len(audio) - win_len + 1, hop):
+                w_rms = float(np.sqrt(np.mean(audio[st:st + win_len] ** 2)))
+                if w_rms > max_win_rms:
+                    max_win_rms = w_rms
+                    best_st = st
+            signal = audio[best_st:best_st + win_len]
+        else:
+            signal = audio
+
+        signal = signal.astype(np.float32) - float(np.mean(signal))
+        n = len(signal)
+        if n < 512:
+            return False, "Signal too short for harmonic validation."
+
+        # 1. Autocorrelation peak with Kudirai bridge foldback lag support
+        n_fft = 2 * n
+        f = np.fft.rfft(signal, n=n_fft)
+        corr = np.fft.irfft(f * np.conj(f), n=n_fft)[:n]
+        if corr[0] <= 1e-10:
+            return False, "Audio signal lacks energy."
+        norm_corr = corr / corr[0]
+
+        peak_vals = []
+        for mult in [1.0, 2.0, 3.0, 4.0]:
+            target_lag = int(round((sr / f0) * mult))
+            if target_lag < len(norm_corr) - 2:
+                lag_win = max(2, int(0.12 * target_lag))
+                l_min = max(1, target_lag - lag_win)
+                l_max = min(len(norm_corr) - 1, target_lag + lag_win)
+                if l_max > l_min:
+                    peak_vals.append(float(np.max(norm_corr[l_min:l_max + 1])))
+        peak_val = max(peak_vals) if peak_vals else 0.0
+
+        # 2. Harmonic Energy Ratio (HER) with bridge foldback support
+        fft_mag = np.abs(np.fft.rfft(signal))
+        fft_freqs = np.fft.rfftfreq(n, 1.0 / sr)
+        total_energy = float(np.sum(fft_mag ** 2)) + 1e-10
+
+        hers = []
+        for div in [1.0, 2.0, 3.0, 4.0]:
+            base_f = f0 / div
+            if base_f < 35.0:
+                continue
+            harmonic_energy = 0.0
+            for k in range(1, 14):
+                k_f0 = k * base_f
+                if k_f0 > (sr / 2.0) - 50:
+                    break
+                band = max(4.0, 0.045 * k_f0)
+                mask = (fft_freqs >= k_f0 - band) & (fft_freqs <= k_f0 + band)
+                harmonic_energy += float(np.sum(fft_mag[mask] ** 2))
+            hers.append(float(harmonic_energy / total_energy))
+
+        her = max(hers) if hers else 0.0
+
+        # 3. Spectral Flatness & Peak Prominence
+        geom_mean = np.exp(np.mean(np.log(fft_mag + 1e-10)))
+        arith_mean = np.mean(fft_mag) + 1e-10
+        flatness = float(geom_mean / arith_mean)
+        top_10_mean = float(np.mean(np.sort(fft_mag)[-10:]))
+        peak_prominence = float(top_10_mean / arith_mean)
+
+        is_string = (
+            (peak_val >= 0.65 and her >= 0.40)
+            or (her >= 0.55)
+            or (peak_val >= 0.55 and peak_prominence >= 35.0 and flatness < 0.62)
+        )
+
+        if not is_string:
+            return False, f"Non-Veena sound detected: lacks string harmonic comb structure (periodicity={peak_val:.2f}, HER={her*100:.1f}%)."
+
+        return True, "Valid string harmonic signature."
 
     # ─── Stage 1: Cepstral Lifter ────────────────────────────────────────────
 
@@ -414,6 +508,20 @@ class PhysicsPitchEngine:
         Returns (f0_hz, confidence, method_name)
         """
         if not _HAS_LIBROSA:
+            signal = audio - np.mean(audio)
+            n = len(signal)
+            f = np.fft.rfft(signal, n=2 * n)
+            corr = np.fft.irfft(f * np.conj(f), n=2 * n)[:n]
+            if corr[0] > 0:
+                norm_corr = corr / corr[0]
+                min_lag = max(1, int(sr / 1200.0))
+                max_lag = min(len(norm_corr) - 1, int(sr / 45.0))
+                if max_lag > min_lag:
+                    best_lag = min_lag + int(np.argmax(norm_corr[min_lag:max_lag]))
+                    pk = float(norm_corr[best_lag])
+                    if pk > 0.35 and best_lag > 0:
+                        autocorr_f0 = float(sr / best_lag)
+                        return autocorr_f0, round(pk, 3), "autocorr_pitch"
             return hps_f0_hint, 0.5, "hps_autocorr"
 
         try:

@@ -1,22 +1,266 @@
-<!--
-SPDX-FileCopyrightText: Copyright (C) Arduino s.r.l. and/or its affiliated companies
-
-SPDX-License-Identifier: MPL-2.0
--->
-
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>swar_care_integrated_v6_5</title>
-    <link rel="stylesheet" type="text/css" href="style.css" />
-  </head>
-  <body>
-    <!-- Add your HTML here -->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SwarCare Saraswati Veena Anomaly Monitor</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#0E1117;color:#C9D1D9;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body{min-height:100vh}
+.app{max-width:1180px;margin:auto;padding:24px 18px 40px}
+.hero h1{margin:0;color:#FAFAFA;font-size:clamp(1.4rem,3vw,1.9rem)}
+.hero p{margin:6px 0 0;color:#8B949E;font-size:0.95rem}
+.rule{height:1px;background:#30363D;margin:18px 0}
+.tabs{display:flex;gap:8px}
+.tab{border:1px solid #30363D;background:#161B22;color:#C9D1D9;border-radius:7px;padding:10px 14px;cursor:pointer;font-weight:600;font-size:0.9rem;transition:all .2s ease}
+.tab.active{border-color:#00BCD4;color:#00BCD4;background:#1c232d}
+.panel{display:none}
+.panel.active{display:block}
+.card{background:#161B22;border:1px solid #30363D;border-radius:8px;padding:16px;margin:14px 0;box-shadow:0 4px 12px rgba(0,0,0,0.25)}
+.card h2,.card h3{margin:0 0 12px;color:#FAFAFA}
+.card h3{font-size:1.05rem}
+.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.btn{border:1px solid #30363D;border-radius:7px;padding:11px 12px;background:#21262D;color:#FAFAFA;font-weight:600;cursor:pointer;transition:all .15s ease}
+.btn:hover{border-color:#00BCD4;background:#30363d}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-start{border-color:rgba(0,230,118,0.3);color:#00E676}
+.btn-start:hover:not(:disabled){border-color:#00E676;background:rgba(0,230,118,0.15)}
+.btn-pause{border-color:rgba(255,160,0,0.3);color:#FFA000}
+.btn-pause:hover:not(:disabled){border-color:#FFA000;background:rgba(255,160,0,0.15)}
+.btn-stop{border-color:rgba(255,82,82,0.3);color:#FF5252}
+.btn-stop:hover:not(:disabled){border-color:#FF5252;background:rgba(255,82,82,0.15)}
+.status{text-align:center;border:1px solid #30363D;border-radius:6px;padding:10px;margin-bottom:12px;font:bold 13px monospace;color:#8B949E;transition:all .25s ease}
+.terminal{height:190px;overflow-y:auto;overflow-x:hidden;white-space:pre-wrap;word-break:break-all;background:#161B22;border:1px solid #30363D;border-radius:6px;padding:8px;font:bold 11px Consolas,"Courier New",monospace}
+.terminal .line{line-height:1.35}
+.terminal .idle{display:flex;align-items:center;justify-content:center;height:100%;color:#8B949E;font-size:12px}
+.scope{width:100%;height:210px;background:#161B22;border:1px solid #30363D;border-radius:6px;display:block}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.metric{background:#161B22;border:1px solid #30363D;border-radius:7px;padding:12px}
+.label{color:#8B949E;font-size:13px}
+.value{font-size:1.3rem;font-weight:600;color:#FAFAFA;margin-top:4px}
+.caption{font-size:12px;color:#8B949E;margin-top:4px}
+.ai-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.ai-card{background:#0d1117;border:1px solid #30363d;border-radius:7px;padding:12px}
+.ai-value{font-size:1.2rem;font-weight:600;color:#FAFAFA;margin-top:4px}
+.records{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.record{padding:12px;border:1px solid #30363D;border-radius:7px;background:#161B22;margin:8px 0}
+.record-name{font-family:monospace;font-size:12px;word-break:break-all}
+.record-actions{display:flex;gap:7px;margin-top:8px}
+.small{font-size:12px}
+.muted{color:#8B949E}
+.toast{position:fixed;right:18px;bottom:18px;background:#21262D;border:1px solid #30363D;padding:10px 13px;border-radius:7px;display:none;z-index:20;box-shadow:0 4px 14px rgba(0,0,0,0.5)}
+@media(max-width:640px){
+  .app{padding:16px 10px 30px}
+  .controls,.ai-grid,.records,.metrics{grid-template-columns:1fr}
+  .metric{padding:10px}
+  .value{font-size:1.15rem}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hero"><h1>🎵 SwarCare Anomaly Detection Hub</h1><p>Real-Time Saraswati Veena Vibration &amp; Audio Stream Intelligence</p></div>
+  <div class="rule"></div>
 
-    <script src="libs/socket.io.min.js"></script>
-    <script src="libs/arduino.js"></script>
-    <script src="app.js"></script>
-  </body>
+  <div class="tabs">
+    <button class="tab active" data-tab="live">📡 Live Telemetry &amp; Anomaly Monitor</button>
+    <button class="tab" data-tab="records">📁 Saved Records Explorer</button>
+  </div>
+
+  <section id="live" class="panel active">
+    <div class="card">
+      <h2>⚙️ Hardware Control Deck</h2>
+      <div class="controls">
+        <button id="startBtn" class="btn btn-start">▶ START RECORDING</button>
+        <button id="pauseBtn" class="btn btn-pause">⏸ PAUSE</button>
+        <button id="stopBtn" class="btn btn-stop">⏹ STOP &amp; SAVE</button>
+      </div>
+    </div>
+
+    <!-- SINGLE UNIFIED ANOMALY & DIAGNOSTIC MONITOR -->
+    <div class="card">
+      <h2>🎯 Single Unified Anomaly &amp; Diagnostic Monitor</h2>
+      <p class="muted small" style="margin-top:-6px; margin-bottom:14px;">Parallel Hybrid Engine: Physics Pitch Engine (Tuning) + ML Structural Classifier (527-D YAMNet &amp; Acoustic DSP)</p>
+      
+      <div id="aiContent" class="muted">💡 Anomaly Engine Standing By: Record a session to trigger real-time tuning and structural diagnostics.</div>
+      <button id="aiRefresh" class="btn" style="margin-top:12px">🔄 Refresh Anomaly Diagnostic</button>
+    </div>
+
+    <div class="card">
+      <h2>📡 Live Telemetry</h2>
+      <div id="status" class="status">⏱️ TELEMETRY LINK INITIALISING...</div>
+      <h3>Vibration Serial Monitor (Piezo Sensor)</h3>
+      <div id="terminal" class="terminal"><div class="idle">--- SERIAL MONITOR PIPELINE IDLE ---</div></div>
+      <div class="rule"></div>
+      <h3>Audio Live Monitor (USB Microphone)</h3>
+      <canvas id="scope" class="scope"></canvas>
+      <div class="metrics">
+        <div class="metric"><div class="label">Vibration Samples</div><div id="pSamples" class="value">0</div><div id="pLines" class="caption">📝 Piezo Lines: 0</div><div id="pTime" class="caption">⏱️ Piezo Duration: 0.00 s</div></div>
+        <div class="metric"><div class="label">Audio Samples</div><div id="aSamples" class="value">0</div><div id="aLines" class="caption">🔊 Audio WAV: 0</div><div id="aTime" class="caption">⏱️ Audio Duration: 0.00 s</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="records" class="panel">
+    <div class="card"><h2>📁 Saved Records Explorer</h2><div id="recordsList" class="records"></div><button id="recordsRefresh" class="btn" style="margin-top:12px">🔄 Refresh Records</button></div>
+  </section>
+</div>
+<div id="toast" class="toast"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+  const socket = typeof io === 'function' ? io() : { on: () => {}, emit: () => {} };
+  const statusEl = document.getElementById('status');
+  const terminalEl = document.getElementById('terminal');
+  const canvas = document.getElementById('scope');
+  const ctx = canvas.getContext('2d', {alpha:false});
+  const history = [];
+  const MAX_HISTORY = 3000;
+  let totalCaptureCount = 0;
+  let piezoRate = 2000;
+  let audioRate = 16000;
+  let state = 'STOPPED';
+  let dirty = true;
+  let lastTerminalSig = '';
+
+  const $ = id => document.getElementById(id);
+  const toast = msg => { const t=$('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>t.style.display='none',1800); };
+
+  function setStatus() {
+    if(state==='RECORDING'){ statusEl.textContent='⏱️ ACTIVE CAPTURE — TELEMETRY LIVE'; statusEl.style.borderColor='#00E676'; statusEl.style.color='#00E676'; }
+    else if(state==='PAUSED'){ statusEl.textContent='⏸️ RECORDING PAUSED'; statusEl.style.borderColor='#FFA000'; statusEl.style.color='#FFA000'; }
+    else if(state==='STOPPING'){ statusEl.textContent='⏳ WRITING DATA STREAMS GRACEFULLY...'; statusEl.style.borderColor='#00BCD4'; statusEl.style.color='#00BCD4'; }
+    else { statusEl.textContent='⏹️ SYSTEM IDLE — TELEMETRY READY'; statusEl.style.borderColor='#30363D'; statusEl.style.color='#8B949E'; }
+    $('startBtn').disabled = state==='RECORDING' || state==='STOPPING';
+    $('pauseBtn').disabled = state!=='RECORDING';
+    $('stopBtn').disabled = !(state==='RECORDING'||state==='PAUSED');
+    $('startBtn').textContent = state==='PAUSED' ? '▶ RESUME' : '▶ START RECORDING';
+  }
+
+  function updateMetrics(d){
+    piezoRate=Number(d.piezo_rate||2000); audioRate=Number(d.audio_rate||16000);
+    const ps=Number(d.piezo_samples||0), as=Number(d.audio_samples||0);
+    $('pSamples').textContent=ps.toLocaleString(); $('pLines').textContent='📝 Piezo Lines: '+(ps?ps+1:0).toLocaleString(); $('pTime').textContent='⏱️ Piezo Duration: '+(ps/piezoRate).toFixed(2)+' s';
+    $('aSamples').textContent=as.toLocaleString(); $('aLines').textContent='🔊 Audio WAV: '+as.toLocaleString(); $('aTime').textContent='⏱️ Audio Duration: '+(as/audioRate).toFixed(2)+' s';
+  }
+
+  function renderTerminal(lines){
+    const sig=JSON.stringify(lines||[]); if(sig===lastTerminalSig)return; lastTerminalSig=sig;
+    terminalEl.innerHTML='';
+    if(!lines||!lines.length){terminalEl.innerHTML='<div class="idle">--- SERIAL MONITOR PIPELINE IDLE ---</div>';return;}
+    let lastBlock=null, baseTime=null;
+    (lines||[]).forEach((item,idx)=>{
+      const txt=Array.isArray(item)?String(item[0]||''):''; const active=Array.isArray(item)?!!item[1]:false;
+      const m=txt.match(/(?:TIME|T)\s*:\s*(\d{1,2}):(\d{2}):([\d.]+)/i); const sec=m?Number(m[1])*3600+Number(m[2])*60+Number(m[3]):idx/piezoRate;
+      if(baseTime===null)baseTime=sec; const block=Math.floor(sec/2)*2;
+      if(lastBlock!==null&&block!==lastBlock){const marker=document.createElement('div');marker.style.cssText='border-top:1px dotted #00BCD4;background:rgba(0,188,212,.1);color:#00BCD4;text-align:center;font-size:9.5px;margin:4px 0;padding:2px 0;font-weight:bold';marker.textContent='⏱️ ┈┈ 2s MARKER ┈┈';terminalEl.appendChild(marker)}
+      lastBlock=block; const line=document.createElement('div');line.className='line';line.style.color=active?'#00E676':'#C9D1D9';line.textContent=txt.replace(/\s*:\s*/g,':').replace(/\s*\|\s*/g,'|');terminalEl.appendChild(line);
+    });
+    terminalEl.scrollTop=terminalEl.scrollHeight;
+  }
+
+  function appendAudio(values){ if(!Array.isArray(values))return; for(const v of values)history.push(Number(v)||0); if(history.length>MAX_HISTORY)history.splice(0,history.length-MAX_HISTORY); totalCaptureCount+=values.length; dirty=true; }
+
+  function resize(){const dpr=Math.min(devicePixelRatio||1,2), w=Math.max(280,canvas.clientWidth||360), h=210;canvas.width=w*dpr;canvas.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);dirty=true;}
+
+  function draw(){
+    if(!dirty)return;
+    const dpr=Math.min(devicePixelRatio||1,2),w=canvas.width/dpr,h=canvas.height/dpr,mobile=w<480,padL=mobile?56:68,padB=mobile?28:32,padT=18,padR=mobile?12:20,plotW=w-padL-padR,plotH=h-padT-padB,mid=padT+plotH/2;
+    ctx.fillStyle='#161B22';ctx.fillRect(0,0,w,h);ctx.strokeStyle='#21262D';ctx.lineWidth=1;for(let i=0;i<=4;i++){let y=padT+plotH*i/4;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(w-padR,y);ctx.stroke()}ctx.strokeStyle='#30363D';ctx.strokeRect(padL,padT,plotW,plotH);ctx.setLineDash([3,3]);ctx.strokeStyle='#8B949E';ctx.beginPath();ctx.moveTo(padL,mid);ctx.lineTo(w-padR,mid);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#8B949E';ctx.font=mobile?'8.5px monospace':'10px monospace';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText('+1.0',padL-6,padT);ctx.fillText('0.0',padL-6,mid);ctx.fillText('-1.0',padL-6,padT+plotH);
+    if(history.length&&state==='RECORDING'){const visible=Math.min(history.length,2002),first=history.length-visible,right=w-padR,pixPerSec=plotW/4;ctx.fillStyle='#00E676';const bw=mobile?1.5:2;for(let i=history.length-1;i>=first;i--){const ago=history.length-1-i,x=right-(ago/audioRate)*pixPerSec;if(x<padL)break;const amp=Math.abs(history[i]),bh=Math.max(2,amp*plotH*.88);ctx.fillRect(x-bw/2,mid-bh/2,bw,bh)}}else if(!history.length||state!=='RECORDING'){ctx.fillStyle='#8B949E';ctx.font=mobile?'10px monospace':'11.5px monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('--- AUDIO MONITOR IDLE ---',padL+plotW/2,mid)}
+    ctx.fillStyle='#8B949E';ctx.font=mobile?'bold 9.5px monospace':'bold 11px monospace';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText('Time',padL+plotW/2,h-12);ctx.save();ctx.translate(mobile?12:14,padT+plotH/2);ctx.rotate(-Math.PI/2);ctx.fillStyle='#C9D1D9';ctx.fillText('Normalised Amplitude',0,0);ctx.restore();dirty=false;
+  }
+  resize();window.addEventListener('resize',resize);
+  
+  function animLoop(){
+    draw();
+    requestAnimationFrame(animLoop);
+  }
+  requestAnimationFrame(animLoop);
+
+  socket.on('connect',()=>{statusEl.textContent='⏱️ TELEMETRY LINK CONNECTED';socket.emit('refresh',{});});
+  socket.on('disconnect',()=>{statusEl.textContent='⚠️ TELEMETRY LINK DISCONNECTED';statusEl.style.color='#FFA000';});
+  socket.on('telemetry',d=>{state=d.state||'STOPPED';updateMetrics(d);renderTerminal(d.terminal||[]);if(state==='RECORDING')appendAudio(d.audio||[]);else if(state==='STOPPED'&&history.length){history.length=0;totalCaptureCount=0;dirty=true}setStatus();});
+  socket.on('control_result',r=>{if(r&&!r.ok)toast('⚠️ '+(r.error||'Operation failed'));else toast('✓ Command accepted');});
+
+  function control(action){socket.emit('control',{action});}
+  $('startBtn').onclick=()=>control('start');$('pauseBtn').onclick=()=>control('pause');$('stopBtn').onclick=()=>control('stop');
+
+  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.tab).classList.add('active');if(b.dataset.tab==='records')loadRecords();});
+
+  async function api(path,opts){const r=await fetch(path,opts);return await r.json()}
+  
+  const STRUCT_DESCRIPTIONS = {
+    0: {title: "Structurally Sound & Resonant", summary: "Optimal acoustic resonance across the resonator (Kudam), bridge (Kudirai), and neck (Dandi)."},
+    1: {title: "Structurally Sound & Resonant", summary: "Optimal acoustic resonance across the resonator (Kudam), bridge (Kudirai), and neck (Dandi)."},
+    2: {title: "Fret Wear / Misalignment", summary: "Bronze fret surface wear or loose fret fixing along the wax ledge (Melakku)."},
+    3: {title: "String Corrosion / Oxidation", summary: "Surface oxidation and metal fatigue on steel/bronze core strings."},
+    4: {title: "Bridge Tilt / Kudirai Asymmetry", summary: "Angular misalignment or uneven base contact of the main bridge (Kudirai)."},
+    5: {title: "Kudam Crack / Resonator Shell Fracture", summary: "Structural hairline crack or wood joint separation in the Jackwood resonator shell (Kudam)."},
+    6: {title: "Loose Peg / Birudai Slippage", summary: "Taper pin friction failure in the tuning peg box (Birudai)."},
+    7: {title: "String Buzz / Jiva Thread Mismatch", summary: "Improper contact angle between string and bridge curvature or damaged buzzing thread."},
+    8: {title: "Sympathetic Resonance Dampening", summary: "Acoustic damping in auxiliary drone resonators or wax wall structure."},
+    9: {title: "Finish Degradation / Shellac Flaking", summary: "Degraded French polish / shellac coating on the wood body."},
+    10: {title: "Detached Bridge / Base Separation", summary: "Partial adhesive separation between the bone/wood Kudirai base and soundboard."},
+    11: {title: "Nut Groove Wear / Meru Slit Wear", summary: "Deepened string guide grooves at the upper bridge (Meru)."}
+  };
+
+  async function loadAI(){
+    try{
+      const d=await api('/api/ai');
+      if(d.available || d.prefix){
+        const tuning = d.tuning || {};
+        const quality = d.quality || {};
+        const isHealthy = d.is_healthy !== false;
+        const qcls = quality.fault_class || 0;
+        const depth = STRUCT_DESCRIPTIONS[qcls] || {title: quality.label || "Healthy", summary: "Structural assessment completed."};
+        const bannerColor = isHealthy ? "#00E676" : "#FF5252";
+        const bannerText = isHealthy ? "🟢 HEALTHY &amp; IN TUNE" : `🚨 ANOMALY DETECTED (${depth.title})`;
+
+        $('aiContent').innerHTML=`
+          <div style="border:1px solid ${bannerColor}; border-radius:6px; padding:10px; background:rgba(0,0,0,0.25); color:${bannerColor}; font-weight:bold; text-align:center; font-size:14px; margin-bottom:12px;">
+            ${bannerText}
+          </div>
+          <div class="ai-grid">
+            <div class="ai-card">
+              <div class="label">Overall Health Status</div>
+              <div class="ai-value">${isHealthy ? '✅ Healthy' : '🚨 Anomaly'}</div>
+              <div class="caption">${quality.confidence || 0}% confidence</div>
+            </div>
+            <div class="ai-card">
+              <div class="label">Tuning Aspect</div>
+              <div class="ai-value">${tuning.status || 'IN_TUNE'}</div>
+              <div class="caption">${(tuning.cents_dev || 0).toFixed(1)} cents (${(tuning.f0_hz || 0).toFixed(1)} Hz)</div>
+            </div>
+            <div class="ai-card">
+              <div class="label">Identified Defect</div>
+              <div class="ai-value">${depth.title}</div>
+              <div class="caption">Class ${qcls}</div>
+            </div>
+          </div>
+          <div style="background:#0d1117; border:1px solid #30363d; border-radius:7px; padding:12px; margin-top:12px;">
+            <div style="color:#00BCD4; font-weight:bold; font-size:13px;">🔬 Structural Issues Depth: ${depth.title}</div>
+            <div style="color:#C9D1D9; font-size:12px; margin-top:4px;">${depth.summary}</div>
+            <div class="caption" style="margin-top:6px;">Target Session: 📄 ${d.prefix || 'Live Session'} │ Vector: 527-D Parallel Hybrid</div>
+          </div>
+        `;
+      } else {
+        $('aiContent').textContent='💡 Anomaly Engine Standing By: Record a session to trigger diagnostics.';
+      }
+    }catch(e){toast('AI request failed')}
+  }
+  $('aiRefresh').onclick=loadAI;
+
+  function fmtSize(n){if(n<1024)return n+' B';if(n<1048576)return (n/1024).toFixed(1)+' KB';return (n/1048576).toFixed(1)+' MB'}
+  async function downloadRecord(name){try{const d=await api('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});if(!d.ok){toast('Download failed');return}const bytes=Uint8Array.from(atob(d.data),c=>c.charCodeAt(0));const blob=new Blob([bytes],{type:d.mime});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=d.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}catch(e){toast('Download failed')}}
+  async function deleteRecord(name){if(!confirm('Delete '+name+'?'))return;const d=await api('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});toast(d.ok?'✓ Deleted':'⚠️ Delete failed');loadRecords()}
+  async function loadRecords(){try{const files=await api('/api/records');const box=$('recordsList');box.innerHTML='';if(!files.length){box.innerHTML='<div class="muted">No CSV/WAV records available.</div>';return}const left=document.createElement('div'),right=document.createElement('div');box.append(left,right);for(const f of files){const el=document.createElement('div');el.className='record';el.innerHTML=`<div class="record-name">${f.name}</div><div class="small muted">${f.type.toUpperCase()} · ${fmtSize(f.size)}</div><div class="record-actions"><button class="btn small">📥 ${f.type.toUpperCase()}</button><button class="btn small">🗑️</button></div>`;el.querySelectorAll('button')[0].onclick=()=>downloadRecord(f.name);el.querySelectorAll('button')[1].onclick=()=>deleteRecord(f.name);(f.type==='csv'?left:right).appendChild(el)}}catch(e){toast('Records request failed')}}
+  $('recordsRefresh').onclick=loadRecords;
+  setStatus();
+})();
+</script>
+</body>
 </html>

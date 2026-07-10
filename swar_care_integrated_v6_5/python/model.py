@@ -527,12 +527,16 @@ def _severity_from_status(status: str) -> int:
     return _STATUS_SEVERITY.get(status, 0)
 
 
-def fuse_status(audio_result: dict, vibration_result) -> str:
+def fuse_status(audio_result, vibration_result) -> str:
     """Worst-of-both-sensors fusion, matching the reference app's logic."""
+    if vibration_result is None and audio_result is None:
+        return "healthy"
     if vibration_result is None:
-        return audio_result["status"]
-    sev_aud = _severity_from_status(audio_result["status"])
-    sev_vib = _severity_from_status(vibration_result["status"])
+        return audio_result.get("status", "healthy")
+    if audio_result is None:
+        return vibration_result.get("status", "healthy")
+    sev_aud = _severity_from_status(audio_result.get("status", "healthy"))
+    sev_vib = _severity_from_status(vibration_result.get("status", "healthy"))
     return _SEVERITY_STATUS[max(sev_aud, sev_vib)]
 
 
@@ -633,7 +637,7 @@ def _build_report(audio_result, vib_result, audio_err, vib_err, raw_adc) -> dict
             "audio": audio_dict,
         }
 
-    fused = fuse_status(audio_result or {"status": "healthy"}, vib_result)
+    fused = fuse_status(audio_result, vib_result)
     notify_mcu(fused)
 
     # UI-facing score: 0-1, worst of the two normalized sensor distances
@@ -851,40 +855,75 @@ def _extract_yamnet_embedding(audio: np.ndarray) -> np.ndarray:
 
 
 def _extract_veena_features(audio: np.ndarray, sr: int = 16000) -> np.ndarray:
-    """Build the 514-dim feature vector used by the Veena RF quality classifier.
+    """Build the 527-dim feature vector used by the Veena RF quality classifier.
 
-    Features (must exactly match what export_trained_models.py / train_and_evaluate.py
-    used when fitting the classifier):
-      [0:512]  YAMNet 512-class averaged scores  (first 512 of the 521-dim vector)
-      [512]    Energy Decay Rate  (delta-RMS across 4 equal segments)
-      [513]    High-Frequency Spectral Flatness  (>2000 Hz sub-band)
+    Features (matches train_and_evaluate.py & export_trained_models.py):
+      [0:521]   YAMNet 521-class averaged embeddings
+      [521]     F0 fundamental frequency via autocorrelation (Hz)
+      [522]     min_cents deviation across target string frequencies
+      [523]     s1_err deviation from S1 Sarani (146.83 Hz)
+      [524]     detuning_trigger boolean flag
+      [525]     Energy Decay Rate (dRMS/dt across onset and tail)
+      [526]     High-Frequency Spectral Flatness (>2000 Hz sub-band)
     """
-    yamnet_emb = _extract_yamnet_embedding(audio)  # (521,)
-    yamnet_512 = yamnet_emb[:512]                   # keep first 512 dims
+    yamnet_521 = _extract_yamnet_embedding(audio)  # (521,)
 
-    # --- Energy Decay Rate ---
-    n_seg = 4
-    seg_len = max(1, len(audio) // n_seg)
-    rms_segs = np.array([
-        float(np.sqrt(np.mean(audio[i * seg_len:(i + 1) * seg_len] ** 2)))
-        for i in range(n_seg)
-    ], dtype=np.float32)
-    delta_rms = float(rms_segs[-1] - rms_segs[0])  # negative = decaying (healthy pluck)
-
-    # --- High-Frequency Spectral Flatness (>2000 Hz sub-band) ---
-    n = len(audio)
-    fft_mag = np.abs(np.fft.rfft(audio.astype(np.float32)))
-    freqs    = np.fft.rfftfreq(n, d=1.0 / sr)
-    hf_mask  = freqs > 2000.0
-    hf_mag   = fft_mag[hf_mask]
-    if len(hf_mag) > 0 and np.sum(hf_mag) > 0:
-        geom_mean = np.exp(np.mean(np.log(hf_mag + 1e-10)))
-        arith_mean = np.mean(hf_mag)
-        hf_flatness = float(geom_mean / (arith_mean + 1e-10))
+    # 1. Fundamental frequency F0 via autocorrelation
+    signal = audio.astype(np.float32) - float(np.mean(audio))
+    n_sig = len(signal)
+    if n_sig > 0:
+        n_fft = 2 * n_sig
+        fft_c = np.fft.rfft(signal, n=n_fft)
+        r = np.fft.irfft(fft_c * np.conj(fft_c), n=n_fft)[:n_sig]
+        min_lag, max_lag = int(sr / 400.0), int(sr / 45.0)
+        if len(r) > max_lag and max_lag > min_lag:
+            peak_lag = min_lag + int(np.argmax(r[min_lag:max_lag]))
+            f0_val = float(sr / float(peak_lag)) if peak_lag > 0 else 0.0
+        else:
+            f0_val = 0.0
     else:
-        hf_flatness = 0.0
+        f0_val = 0.0
 
-    return np.concatenate([[delta_rms, hf_flatness], yamnet_512]).astype(np.float32)  # (514,)
+    # 2-4. Cents deviation, S1 error, Detuning trigger
+    target_f0s = np.array([146.83, 110.00, 73.42, 55.00], dtype=np.float32)
+    s1_target = 146.83
+    if f0_val > 30.0:
+        cents_err = np.abs(1200.0 * np.log2(f0_val / target_f0s))
+        min_cents = float(np.min(cents_err))
+        s1_err = float(f0_val - s1_target)
+        detuning_trigger = float((-25.0 <= s1_err <= -8.0) or (150.0 <= min_cents <= 400.0))
+    else:
+        min_cents = 1200.0
+        s1_err = -100.0
+        detuning_trigger = 0.0
+
+    # 5. Energy Decay Rate (dRMS/dt): differentiates healthy decay from structural defects
+    onset_samples = int(0.3 * sr)
+    tail_samples = int(1.2 * sr)
+    rms_onset = float(np.sqrt(np.mean(audio[:onset_samples] ** 2))) if len(audio) >= onset_samples else float(np.sqrt(np.mean(audio ** 2))) if len(audio) else 0.0
+    rms_tail = float(np.sqrt(np.mean(audio[tail_samples:] ** 2))) if len(audio) > tail_samples else 0.0
+    decay_rate = float((rms_onset - rms_tail) / (rms_onset + 1e-6))
+
+    # 6. High-Frequency Spectral Flatness (>2000 Hz)
+    flatness_hf = 0.0
+    try:
+        import librosa
+        stft_hf = np.abs(librosa.stft(audio.astype(np.float32), n_fft=2048, hop_length=512))[256:, :]
+        if stft_hf.size > 0:
+            flatness_hf = float(np.mean(librosa.feature.spectral_flatness(S=stft_hf)))
+    except Exception:
+        n_fft = 2048
+        fft_mag = np.abs(np.fft.rfft(audio.astype(np.float32), n=n_fft))
+        freqs = np.fft.rfftfreq(n_fft, d=1.0 / sr)
+        hf_mask = freqs > 2000.0
+        hf_mag = fft_mag[hf_mask]
+        if len(hf_mag) > 0 and np.sum(hf_mag) > 0:
+            geom_mean = np.exp(np.mean(np.log(hf_mag + 1e-10)))
+            arith_mean = np.mean(hf_mag)
+            flatness_hf = float(geom_mean / (arith_mean + 1e-10))
+
+    pitch_features = np.array([f0_val, min_cents, s1_err, detuning_trigger, decay_rate, flatness_hf], dtype=np.float32)
+    return np.concatenate([yamnet_521, pitch_features]).astype(np.float32)  # Exactly 527 dims
 
 
 # ---------------------------------------------------------------------------
@@ -906,14 +945,197 @@ _VEENA_FAULT_LABELS: dict = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Acoustic Sound Type & Non-Veena / Speech Validation
+# ---------------------------------------------------------------------------
+
+def classify_audio_sound_type(audio: np.ndarray, sr: int = 16000) -> dict:
+    """
+    Evaluates whether audio is silence, human speech, ambient noise, or genuine
+    Saraswati Veena string resonance.
+
+    Analyzes the active pluck excitation window using:
+      1. Energy & Silence Gate.
+      2. Autocorrelation modal periodicity with bridge foldback lags.
+      3. Harmonic Energy Ratio (HER) across integer string partials.
+      4. Spectral peak prominence & flatness.
+      5. YAMNet AudioSet event classification (when available).
+    """
+    rms = float(np.sqrt(np.mean(audio ** 2)))
+    peak_amp = float(np.max(np.abs(audio))) if len(audio) > 0 else 0.0
+
+    # 1. Silence Gate
+    if rms < 0.004 or peak_amp < 0.008:
+        return {
+            "is_veena": False,
+            "sound_type": "Silence",
+            "is_silent": True,
+            "confidence": 0.99,
+            "reason": "Signal below audible excitation threshold.",
+        }
+
+    # 2. Extract strongest 1.0-second active pluck/vibration window (handles decaying tails and delayed plucks)
+    win_len = int(1.0 * sr)
+    if len(audio) > win_len:
+        hop = int(0.10 * sr)
+        max_win_rms = 0.0
+        best_st = 0
+        for st in range(0, len(audio) - win_len + 1, hop):
+            w_rms = float(np.sqrt(np.mean(audio[st:st + win_len] ** 2)))
+            if w_rms > max_win_rms:
+                max_win_rms = w_rms
+                best_st = st
+        sig = audio[best_st:best_st + win_len]
+        if max_win_rms < 0.005:
+            return {
+                "is_veena": False,
+                "sound_type": "Silence",
+                "is_silent": True,
+                "confidence": 0.99,
+                "reason": "Decayed below audible excitation threshold.",
+            }
+    else:
+        sig = audio
+
+    sig = sig.astype(np.float32) - float(np.mean(sig))
+    n = len(sig)
+    if n < 512:
+        return {
+            "is_veena": False,
+            "sound_type": "Too Short",
+            "is_silent": False,
+            "confidence": 0.5,
+            "reason": "Audio segment too short.",
+        }
+
+    # 3. Autocorrelation Periodicity & F0 Candidate
+    n_fft = 2 * n
+    f = np.fft.rfft(sig, n=n_fft)
+    corr = np.fft.irfft(f * np.conj(f), n=n_fft)[:n]
+    norm_corr = corr / corr[0] if corr[0] > 0 else corr
+
+    min_lag = max(1, int(sr / 1200.0))  # Max ~1200 Hz
+    max_lag = min(len(norm_corr) - 1, int(sr / 45.0))    # Min ~45 Hz
+    if max_lag > min_lag:
+        peak_offset = int(np.argmax(norm_corr[min_lag:max_lag]))
+        best_lag = min_lag + peak_offset
+        autocorr_peak = float(norm_corr[best_lag])
+        f0_est = float(sr / best_lag) if best_lag > 0 else 0.0
+    else:
+        autocorr_peak = 0.0
+        f0_est = 0.0
+
+    # Kudirai bridge foldback lags for lower Mandra/Anumandra strings
+    lag_foldback_peaks = [autocorr_peak]
+    for mult in [2.0, 3.0, 4.0]:
+        t_lag = int(round(best_lag * mult))
+        if t_lag < len(norm_corr) - 2:
+            win = max(2, int(0.10 * t_lag))
+            l_min = max(1, t_lag - win)
+            l_max = min(len(norm_corr) - 1, t_lag + win)
+            if l_max > l_min:
+                lag_foldback_peaks.append(float(np.max(norm_corr[l_min:l_max + 1])))
+    best_periodicity = max(lag_foldback_peaks) if lag_foldback_peaks else autocorr_peak
+
+    # 4. Harmonic Energy Ratio (HER) across integer harmonics (with subharmonic foldback)
+    fft_mag = np.abs(np.fft.rfft(sig))
+    fft_freqs = np.fft.rfftfreq(n, 1.0 / sr)
+    total_energy = float(np.sum(fft_mag ** 2)) + 1e-10
+
+    hers = []
+    for div in [1.0, 2.0, 3.0, 4.0]:
+        base_f = f0_est / div
+        if base_f < 35.0:
+            continue
+        harmonic_energy = 0.0
+        for k in range(1, 14):
+            k_f0 = k * base_f
+            if k_f0 > (sr / 2.0) - 50:
+                break
+            band = max(4.0, 0.045 * k_f0)
+            mask = (fft_freqs >= k_f0 - band) & (fft_freqs <= k_f0 + band)
+            harmonic_energy += float(np.sum(fft_mag[mask] ** 2))
+        hers.append(float(harmonic_energy / total_energy))
+
+    her = max(hers) if hers else 0.0
+
+    # 5. Spectral Flatness
+    geom_mean = np.exp(np.mean(np.log(fft_mag + 1e-10)))
+    arith_mean = np.mean(fft_mag) + 1e-10
+    flatness = float(geom_mean / arith_mean)
+
+    # 6. Spectral Peak Prominence (Ratio of top discrete peaks to average spectrum)
+    top_10_mean = float(np.mean(np.sort(fft_mag)[-10:]))
+    peak_prominence = float(top_10_mean / arith_mean)
+
+    # 7. YAMNet Speech class probability (when interpreter is available)
+    speech_score = 0.0
+    music_score = 0.0
+    try:
+        interpreter = load_interpreter()
+        yamnet_521, _ = run_yamnet(interpreter, sig)
+        speech_score = float(np.max(yamnet_521[0:68]))
+        music_score = float(np.max(yamnet_521[132:160]))
+    except Exception:
+        pass
+
+    if speech_score > 0.25 and speech_score > (music_score * 1.5):
+        return {
+            "is_veena": False,
+            "sound_type": "Human Speech / Voice",
+            "is_silent": False,
+            "f0_est": f0_est,
+            "confidence": speech_score,
+            "her": her,
+            "reason": f"YAMNet acoustic classifier detected human speech/voice (confidence={speech_score*100:.1f}%).",
+        }
+
+    is_string_resonance = (
+        (best_periodicity >= 0.65 and her >= 0.40)
+        or (her >= 0.55)
+        or (best_periodicity >= 0.55 and peak_prominence >= 35.0 and flatness < 0.62)
+    )
+
+    if is_string_resonance:
+        return {
+            "is_veena": True,
+            "sound_type": "Veena String Resonance",
+            "is_silent": False,
+            "f0_est": f0_est,
+            "periodicity": best_periodicity,
+            "her": her,
+            "confidence": 0.95,
+            "reason": "String modal harmonic comb verified.",
+        }
+
+    if flatness > 0.45 or best_periodicity < 0.35:
+        return {
+            "is_veena": False,
+            "sound_type": "Ambient Noise",
+            "is_silent": False,
+            "f0_est": f0_est,
+            "confidence": 0.85,
+            "reason": f"Diffuse non-harmonic noise distribution (flatness={flatness:.2f}, HER={her*100:.1f}%).",
+        }
+
+    return {
+        "is_veena": False,
+        "sound_type": "Human Speech / Voice",
+        "is_silent": False,
+        "f0_est": f0_est,
+        "confidence": 0.85,
+        "reason": f"Non-string acoustic event (periodicity={best_periodicity:.2f}, HER={her*100:.1f}%).",
+    }
+
+
 def _run_ml_quality(audio: np.ndarray, sr: int = 16000) -> dict:
     """ML branch: extract features → scale → classify structural quality."""
     t0 = time.time()
     try:
-        features = _extract_veena_features(audio, sr)          # (514,)
+        features = _extract_veena_features(audio, sr)          # (527,)
         scaler = _load_veena_scaler()
         clf    = _load_veena_classifier()
-        feat_scaled = scaler.transform(features.reshape(1, -1))  # (1, 514)
+        feat_scaled = scaler.transform(features.reshape(1, -1))
         pred_class  = int(clf.predict(feat_scaled)[0])
         proba       = clf.predict_proba(feat_scaled)[0]
         confidence  = round(float(np.max(proba)) * 100, 1)
@@ -933,15 +1155,9 @@ def _run_ml_quality(audio: np.ndarray, sr: int = 16000) -> dict:
 
 def _run_physics_tuning(audio: np.ndarray, sr: int, tonic_hz: float, cents_threshold: float,
                         string_label: Optional[str] = None) -> dict:
-    """Physics branch: run PhysicsPitchEngine and return per-string tuning dict.
-
-    The import is done inside this function so it is always resolved relative
-    to _SCRIPT_DIR (already on sys.path since module load), not the caller's CWD.
-    """
+    """Physics branch: run PhysicsPitchEngine and return per-string tuning dict."""
     t0 = time.time()
     try:
-        # _SCRIPT_DIR is on sys.path — this import is now guaranteed to succeed
-        # if physics_pitch_engine.py exists in the same folder as model.py.
         import importlib
         ppe_mod = importlib.import_module("physics_pitch_engine")
         PhysicsPitchEngine = ppe_mod.PhysicsPitchEngine
@@ -978,24 +1194,7 @@ def _run_physics_tuning(audio: np.ndarray, sr: int, tonic_hz: float, cents_thres
 
 
 class VeenaDiagnosticModel:
-    """Parallel hybrid Veena diagnostic model.
-
-    Runs the Physics Pitch Engine (tuning) and the ML Quality Classifier
-    (structural fault detection) SIMULTANEOUSLY in two threads, then merges
-    the results. This avoids the sequential-gate blocking problem where
-    defect-distorted audio would fail the physics check and never reach ML.
-
-    Usage::
-
-        result = VeenaDiagnosticModel.evaluate(
-            recordings_dir, prefix,
-            tonic_hz=130.81,         # Sa = C3
-            string_label="S1",       # Which string was plucked (optional)
-        )
-        # result["tuning"]  -> physics pitch result
-        # result["quality"] -> ML structural quality result
-        # result["status"]  -> fused verdict: "Healthy" | "Fault Detected"
-    """
+    """Parallel hybrid Veena diagnostic model with sound-type validation."""
 
     @staticmethod
     def evaluate(
@@ -1006,12 +1205,14 @@ class VeenaDiagnosticModel:
         string_label: Optional[str] = None,
         audio_sr: int = 16000,
     ) -> dict:
-        """File-based evaluation: reads {prefix}_audio.wav and runs both branches."""
+        """File-based evaluation: reads {prefix}_audio.wav and runs validation & diagnostics."""
         wav_path = os.path.join(recordings_dir, f"{prefix}_audio.wav")
         if not os.path.exists(wav_path):
             return {
                 "available": False,
                 "error": f"WAV file not found: {wav_path}",
+                "status": "No Data",
+                "is_healthy": False,
                 "tuning": {"available": False, "error": "No audio file"},
                 "quality": {"available": False, "error": "No audio file"},
             }
@@ -1027,6 +1228,8 @@ class VeenaDiagnosticModel:
             return {
                 "available": False,
                 "error": str(exc),
+                "status": "Error",
+                "is_healthy": False,
                 "tuning": {"available": False, "error": str(exc)},
                 "quality": {"available": False, "error": str(exc)},
             }
@@ -1051,6 +1254,8 @@ class VeenaDiagnosticModel:
             return {
                 "available": False,
                 "error": msg,
+                "status": "Buffering",
+                "is_healthy": False,
                 "tuning": {"available": False, "error": msg},
                 "quality": {"available": False, "error": msg},
             }
@@ -1067,7 +1272,77 @@ class VeenaDiagnosticModel:
         cents_threshold: float,
         string_label: Optional[str],
     ) -> dict:
-        """Core: launches physics + ML in parallel threads, merges results."""
+        """Core: validates sound type, launches physics + ML in parallel, merges results."""
+        # 1. First Gate: Sound Type & Instrument Verification
+        sound_info = classify_audio_sound_type(audio, sr)
+
+        if sound_info.get("is_silent", False):
+            return {
+                "available": True,
+                "status": "Silence",
+                "is_healthy": False,
+                "is_veena": False,
+                "sound_type": "Silence",
+                "message": "No audio signal detected (silence/idle). Please pluck a Saraswati Veena string.",
+                "tuning": {
+                    "available": True,
+                    "status": "SILENCE",
+                    "f0_hz": 0.0,
+                    "cents_dev": 0.0,
+                    "hz_dev": 0.0,
+                    "string_name": "—",
+                    "target_hz": 0.0,
+                    "confidence": 0.0,
+                    "message": "Audio stream is silent or below threshold.",
+                    "method": "none",
+                },
+                "quality": {
+                    "available": False,
+                    "is_healthy": False,
+                    "fault_class": -2,
+                    "label": "Silence / Idle",
+                    "confidence": 100.0,
+                },
+                "tonic_hz": round(tonic_hz, 3),
+                "string_label": string_label or "auto",
+                "sound_info": sound_info,
+            }
+
+        if not sound_info.get("is_veena", True):
+            sound_type = sound_info.get("sound_type", "Non-Veena Sound")
+            reason = sound_info.get("reason", "Acoustic signature does not match Saraswati Veena.")
+            return {
+                "available": True,
+                "status": "Non-Veena Sound Detected",
+                "is_healthy": False,
+                "is_veena": False,
+                "sound_type": sound_type,
+                "message": f"{sound_type} detected. {reason}",
+                "tuning": {
+                    "available": True,
+                    "status": "NON_VEENA",
+                    "f0_hz": round(sound_info.get("f0_est", 0.0), 2),
+                    "cents_dev": 0.0,
+                    "hz_dev": 0.0,
+                    "string_name": "Non-Instrument Sound",
+                    "target_hz": 0.0,
+                    "confidence": round(sound_info.get("confidence", 0.0), 2),
+                    "message": f"{sound_type} detected. Please pluck a Saraswati Veena string.",
+                    "method": "sound_classifier",
+                },
+                "quality": {
+                    "available": False,
+                    "is_healthy": False,
+                    "fault_class": -1,
+                    "label": sound_type,
+                    "confidence": round(sound_info.get("confidence", 0.85) * 100, 1),
+                },
+                "tonic_hz": round(tonic_hz, 3),
+                "string_label": string_label or "auto",
+                "sound_info": sound_info,
+            }
+
+        # 2. Validated Veena Audio: Execute parallel physics tuning and ML structural classification
         physics_out: dict = {}
         ml_out: dict = {}
 
@@ -1086,18 +1361,57 @@ class VeenaDiagnosticModel:
         t_phys.join(timeout=10.0)
         t_ml.join(timeout=10.0)
 
-        # Fused verdict: flag a fault if ML says unhealthy OR physics is silent/error
-        quality_ok  = ml_out.get("is_healthy", True)
-        tuning_ok   = physics_out.get("status", "NO_PITCH") == "IN_TUNE"
-        is_healthy  = quality_ok
+        # If physics engine rejected the sound as non-veena or silence
+        phys_status = physics_out.get("status", "NO_PITCH")
+        if phys_status == "NON_VEENA":
+            return {
+                "available": True,
+                "status": "Non-Veena Sound Detected",
+                "is_healthy": False,
+                "is_veena": False,
+                "sound_type": "Non-Veena Sound",
+                "message": physics_out.get("message", "Non-Veena sound detected."),
+                "tuning": physics_out,
+                "quality": {
+                    "available": False,
+                    "is_healthy": False,
+                    "fault_class": -1,
+                    "label": "Non-Veena Sound",
+                    "confidence": 95.0,
+                },
+                "tonic_hz": round(tonic_hz, 3),
+                "string_label": string_label or "auto",
+                "sound_info": sound_info,
+            }
+
+        # Handle quality and health fusion
+        tuning_ok = (phys_status in ["IN_TUNE", "FLAT", "SHARP"])
+        if ml_out.get("available", False):
+            quality_ok = ml_out.get("is_healthy", True)
+            final_quality = ml_out
+        else:
+            # Fallback when ML classifier is buffering or TFLite is unavailable
+            quality_ok = tuning_ok
+            final_quality = {
+                "available": False,
+                "is_healthy": quality_ok,
+                "fault_class": 0 if quality_ok else 1,
+                "label": "Structurally Sound & Resonant" if quality_ok else "Tuning Deviation",
+                "confidence": round(physics_out.get("confidence", 0.85) * 100, 1),
+            }
+
+        is_healthy = quality_ok and tuning_ok
         fused_status = "Healthy" if is_healthy else "Fault Detected"
 
         return {
             "available": True,
             "status":    fused_status,
             "is_healthy": is_healthy,
+            "is_veena":  True,
+            "sound_type": "Veena String Resonance",
             "tuning":    physics_out,
-            "quality":   ml_out,
+            "quality":   final_quality,
             "tonic_hz":  round(tonic_hz, 3),
             "string_label": string_label or "auto",
+            "sound_info": sound_info,
         }
