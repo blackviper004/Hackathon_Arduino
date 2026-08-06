@@ -1,0 +1,16 @@
+{
+  "sample_rate": 16000,
+  "window_seconds": 2.0,
+  "anomaly_threshold": 0.62,
+  "pca_components": 64,
+  "yamnet_input_size": 15600,
+  "yamnet_output_size": 521,
+  "model_files": {
+    "yamnet": "models/yamnet.tflite",
+    "pca": "models/pca_model.npz",
+    "kmeans_center": "models/kmeans_center.npy",
+    "kmeans_std": "models/kmeans_std.npy"
+  },
+  "version": "1.0.0",
+  "project": "SwarCare"
+}
