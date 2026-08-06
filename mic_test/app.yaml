@@ -1,0 +1,9 @@
+name: mic_test
+description: ""
+ports: []
+bricks:
+- arduino:audio_classification:
+    model: glass-breaking
+- arduino:web_ui: {}
+- arduino:streamlit_ui: {}
+icon: 😀
