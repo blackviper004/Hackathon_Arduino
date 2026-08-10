@@ -103,7 +103,7 @@ WINDOW_SEC = float(CONFIG.get("window_seconds", 2.0))
 
 # See "CRITICAL" note in module docstring - best-evidence default, verify against
 # your real piezo hardware rate before trusting vibration verdicts.
-VIBRATION_SAMPLE_RATE_HZ = int(CONFIG.get("vibration_sample_rate_hz", 16000))
+VIBRATION_SAMPLE_RATE_HZ = int(CONFIG.get("vibration_sample_rate_hz", 2000))
 
 
 # =============================================================================
