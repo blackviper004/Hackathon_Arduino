@@ -25,7 +25,7 @@ st.set_page_config(page_title="SwarCare Hub", page_icon="📡", layout="centered
 if "visible_records_limit" not in st.session_state:
     st.session_state.visible_records_limit = 3
 
-st.title("📡 SwarCare Anomaly Detection Hub")
+st.title("🎵 SwarCare Anomaly Detection Hub")
 st.write("Anomaly Detection Using Vibration & Audio Streams")
 st.markdown("---")
 
@@ -124,8 +124,8 @@ def render_hybrid_telemetry_station():
                 const w = canvas.width / dpr;
                 const h = canvas.height / dpr;
                 
-                const padLeft = 45;    
-                const padBottom = 25;  
+                const padLeft = 55;    
+                const padBottom = 35;  
                 const padTop = 15;
                 const padRight = 15;
                 
@@ -192,6 +192,24 @@ def render_hybrid_telemetry_station():
                         ctx.fillText(elapsedSec.toFixed(1) + 's', x, h - padBottom + 6);
                     }}
 
+                    // X-AXIS TITLE
+                    ctx.fillStyle = '#C9D1D9';
+                    ctx.font = 'bold 11px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText('Time (s)', padLeft + plotW / 2, h - 12);
+
+                    // Y-AXIS TITLE (rotated)
+                    ctx.save();
+                    ctx.translate(14, padTop + plotH / 2);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.fillStyle = '#C9D1D9';
+                    ctx.font = 'bold 13px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('Normalised Amplitude', 0, 0);
+                    ctx.restore();
+
                     if(history.length > 0) {{
                         ctx.fillStyle = '#00E676';
                         const barWidth = 2;
@@ -245,87 +263,128 @@ render_hybrid_telemetry_station()
 
 st.markdown("---")
 
-# --- 📁 DYNAMIC SAVED RECORDS PANEL ---
+# --- 📁 DYNAMIC SAVED RECORDS PANEL (SIDE-BY-SIDE SPLIT) ---
 st.subheader("📁 Saved Records")
 
 if os.path.exists(DATA_DIR):
-    all_files = sorted([file for file in os.listdir(DATA_DIR) if file.endswith(('.wav', '.csv'))], reverse=True)
+    raw_files = sorted(os.listdir(DATA_DIR), reverse=True)
+    csv_files = [f for f in raw_files if f.endswith('.csv')]
+    wav_files = [f for f in raw_files if f.endswith('.wav')]
 else:
-    all_files = []
+    csv_files, wav_files = [], []
 
-if not all_files:
-    st.info("No run recordings located in storage. Press Start Recording above to begin.")
-else:
-    displayed_files = all_files[:st.session_state.visible_records_limit]
+limit = st.session_state.visible_records_limit
+
+# Side-by-Side Headings Layout
+col_csv, col_wav = st.columns(2)
+
+# --- LEFT COLUMN: .csv Files ---
+with col_csv:
+    st.markdown("### 📝 `.csv` (Vibration)")
+    displayed_csv = csv_files[:limit]
     
-    for file in displayed_files:
-        file_path = os.path.join(DATA_DIR, file)
-        if not os.path.exists(file_path):
-            continue
+    if not displayed_csv:
+        st.caption("No CSV records available.")
+    else:
+        for file in displayed_csv:
+            file_path = os.path.join(DATA_DIR, file)
+            if not os.path.exists(file_path):
+                continue
 
-        with st.container(border=True):
-            col_name, col_dl, col_del = st.columns([2, 1, 1])
-            
-            with col_name:
+            with st.container(border=True):
                 st.write(f"📄 **{file}**")
                 
-            with col_dl:
-                with open(file_path, "rb") as f:
-                    btn_label = "📥 CSV" if file.endswith('.csv') else "📥 WAV"
-                    mime_type = "text/csv" if file.endswith('.csv') else "audio/wav"
-                    st.download_button(
-                        label=btn_label,
-                        data=f,
-                        file_name=file,
-                        mime=mime_type,
-                        key=f"dl_{file}",
-                        use_container_width=True
-                    )
-            
-            with col_del:
-                if st.button("🗑️ Delete", key=f"del_{file}", use_container_width=True):
-                    try:
-                        os.remove(file_path)
-                        st.toast(f"Removed {file} successfully!", icon="🗑️")
-                        time.sleep(0.2)  
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-            
-            if file.endswith('.wav') and os.path.exists(file_path):
-                with st.expander("▶️ Replay Audio File directly"):
+                btn_col1, btn_col2 = st.columns(2)
+                with btn_col1:
+                    with open(file_path, "rb") as f:
+                        st.download_button(
+                            label="📥 CSV",
+                            data=f,
+                            file_name=file,
+                            mime="text/csv",
+                            key=f"dl_{file}",
+                            use_container_width=True
+                        )
+                with btn_col2:
+                    if st.button("🗑️", key=f"del_{file}", use_container_width=True):
+                        try:
+                            os.remove(file_path)
+                            st.toast(f"Removed {file}!", icon="🗑️")
+                            time.sleep(0.2)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+
+# --- RIGHT COLUMN: .wav Files ---
+with col_wav:
+    st.markdown("### 🔊 `.wav` (Audio)")
+    displayed_wav = wav_files[:limit]
+    
+    if not displayed_wav:
+        st.caption("No WAV records available.")
+    else:
+        for file in displayed_wav:
+            file_path = os.path.join(DATA_DIR, file)
+            if not os.path.exists(file_path):
+                continue
+
+            with st.container(border=True):
+                st.write(f"🎧 **{file}**")
+                
+                btn_col1, btn_col2 = st.columns(2)
+                with btn_col1:
+                    with open(file_path, "rb") as f:
+                        st.download_button(
+                            label="📥 WAV",
+                            data=f,
+                            file_name=file,
+                            mime="audio/wav",
+                            key=f"dl_{file}",
+                            use_container_width=True
+                        )
+                with btn_col2:
+                    if st.button("🗑️", key=f"del_{file}", use_container_width=True):
+                        try:
+                            os.remove(file_path)
+                            st.toast(f"Removed {file}!", icon="🗑️")
+                            time.sleep(0.2)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                
+                with st.expander("▶️ Replay"):
                     st.audio(file_path, format="audio/wav")
 
-    # --- REFACTORED WORKSPACE FOLDER DECK CONTROLS ---
-    st.write("")
-    ctrl_col1, ctrl_col2, ctrl_col3 = st.columns(3)
-    
-    with ctrl_col1:
-        if st.session_state.visible_records_limit < len(all_files):
-            if st.button("🔽 Show More", use_container_width=True):
-                st.session_state.visible_records_limit += 5
-                st.rerun()
-        else:
-            st.button("✨ All Displayed", disabled=True, use_container_width=True)
-            
-    with ctrl_col2:
-        if st.session_state.visible_records_limit > 3:
-            if st.button("🔄 Reset View", use_container_width=True):
-                st.session_state.visible_records_limit = 3
-                st.rerun()
-        else:
-            st.button("🔄 Reset View", disabled=True, use_container_width=True)
-            
-    with ctrl_col3:
-        # FIXED: Complete deep-clean loop to purge all regular files and hidden temporary files (.tmp) to force index reset to 001
-        if st.button("💥 Clear All", use_container_width=True):
-            if os.path.exists(DATA_DIR):
-                for file_to_wipe in os.listdir(DATA_DIR):
-                    try:
-                        os.remove(os.path.join(DATA_DIR, file_to_wipe))
-                    except Exception:
-                        pass
-            st.session_state.visible_records_limit = 3
-            st.toast("Storage directory wiped clean! Counter reset to 001.", icon="💥")
-            time.sleep(0.3)
+# --- WORKSPACE FOLDER DECK CONTROLS ---
+st.write("")
+total_max_files = max(len(csv_files), len(wav_files))
+ctrl_col1, ctrl_col2, ctrl_col3 = st.columns(3)
+
+with ctrl_col1:
+    if limit < total_max_files:
+        if st.button("🔽 Show More", use_container_width=True):
+            st.session_state.visible_records_limit += 5
             st.rerun()
+    else:
+        st.button("✨ All Displayed", disabled=True, use_container_width=True)
+
+with ctrl_col2:
+    if limit > 3:
+        if st.button("🔄 Reset View", use_container_width=True):
+            st.session_state.visible_records_limit = 3
+            st.rerun()
+    else:
+        st.button("🔄 Reset View", disabled=True, use_container_width=True)
+
+with ctrl_col3:
+    if st.button("💥 Clear All", use_container_width=True):
+        if os.path.exists(DATA_DIR):
+            for file_to_wipe in os.listdir(DATA_DIR):
+                try:
+                    os.remove(os.path.join(DATA_DIR, file_to_wipe))
+                except Exception:
+                    pass
+        st.session_state.visible_records_limit = 3
+        st.toast("Storage directory wiped clean! Counter reset to 001.", icon="💥")
+        time.sleep(0.3)
+        st.rerun()
