@@ -1,0 +1,397 @@
+{
+  "metadata": {
+    "total_samples": 707,
+    "healthy_samples": 218,
+    "anomaly_samples": 489,
+    "category_counts": {
+      "Healthy_Baseline": 183,
+      "Fault_3": 85,
+      "Fault_10": 59,
+      "Fault_4": 58,
+      "Fault_7": 56,
+      "Fault_5": 49,
+      "Fault_2": 39,
+      "Fault_1": 37,
+      "Fault_11": 37,
+      "Phone_Healthy": 35,
+      "General_Test": 30,
+      "Test_Pluck": 17,
+      "Frets": 11,
+      "Phone_Fault": 6,
+      "Noise": 5
+    },
+    "device_counts": {
+      "Primary_Mic": 666,
+      "Phone_Mic": 41
+    }
+  },
+  "5_fold_leaderboard": [
+    {
+      "Model Architecture": "Hybrid (YAMNet + Spectral) + SVM (RBF)",
+      "Accuracy": "95.47% +- 1.54%",
+      "F1 (Macro)": "94.86% +- 1.72%",
+      "F1 (Weighted)": "95.54% +- 1.49%",
+      "Precision (Macro)": "93.78% +- 1.96%",
+      "Recall (Macro)": "96.34% +- 1.30%",
+      "ROC-AUC": "0.9934 +- 0.0028",
+      "PR-AUC": "0.9973 +- 0.0011",
+      "raw_acc": 0.9546998301867944,
+      "raw_f1": 0.9485990597872993,
+      "raw_auc": 0.9934089808195024
+    },
+    {
+      "Model Architecture": "Hybrid (YAMNet + Spectral) + Gradient Boosting",
+      "Accuracy": "95.19% +- 0.83%",
+      "F1 (Macro)": "94.40% +- 1.00%",
+      "F1 (Weighted)": "95.20% +- 0.84%",
+      "Precision (Macro)": "94.17% +- 1.03%",
+      "Recall (Macro)": "94.76% +- 1.51%",
+      "ROC-AUC": "0.9916 +- 0.0026",
+      "PR-AUC": "0.9965 +- 0.0011",
+      "raw_acc": 0.9518929177904305,
+      "raw_f1": 0.9439561631209546,
+      "raw_auc": 0.9915879878247587
+    },
+    {
+      "Model Architecture": "Hybrid (YAMNet + Spectral) + Random Forest",
+      "Accuracy": "95.04% +- 1.96%",
+      "F1 (Macro)": "94.32% +- 2.23%",
+      "F1 (Weighted)": "95.10% +- 1.93%",
+      "Precision (Macro)": "93.55% +- 2.42%",
+      "Recall (Macro)": "95.27% +- 2.00%",
+      "ROC-AUC": "0.9851 +- 0.0063",
+      "PR-AUC": "0.9941 +- 0.0023",
+      "raw_acc": 0.9504445110378583,
+      "raw_f1": 0.9432031199810794,
+      "raw_auc": 0.9851439271246957
+    },
+    {
+      "Model Architecture": "YAMNet + PCA + Extra Trees",
+      "Accuracy": "92.21% +- 2.43%",
+      "F1 (Macro)": "90.83% +- 2.86%",
+      "F1 (Weighted)": "92.20% +- 2.42%",
+      "Precision (Macro)": "91.04% +- 3.03%",
+      "Recall (Macro)": "90.67% +- 2.74%",
+      "ROC-AUC": "0.9708 +- 0.0083",
+      "PR-AUC": "0.9879 +- 0.0033",
+      "raw_acc": 0.9221256617720508,
+      "raw_f1": 0.9083489172496645,
+      "raw_auc": 0.9708398923746391
+    },
+    {
+      "Model Architecture": "YAMNet + PCA + Random Forest",
+      "Accuracy": "90.80% +- 2.82%",
+      "F1 (Macro)": "89.04% +- 3.40%",
+      "F1 (Weighted)": "90.73% +- 2.84%",
+      "Precision (Macro)": "89.75% +- 3.58%",
+      "Recall (Macro)": "88.49% +- 3.34%",
+      "ROC-AUC": "0.9667 +- 0.0101",
+      "PR-AUC": "0.9865 +- 0.0039",
+      "raw_acc": 0.9079712316451903,
+      "raw_f1": 0.8904203264275312,
+      "raw_auc": 0.9667180492213886
+    },
+    {
+      "Model Architecture": "YAMNet + PCA + Gradient Boosting",
+      "Accuracy": "90.52% +- 2.05%",
+      "F1 (Macro)": "88.62% +- 2.48%",
+      "F1 (Weighted)": "90.40% +- 2.07%",
+      "Precision (Macro)": "89.68% +- 2.66%",
+      "Recall (Macro)": "87.80% +- 2.43%",
+      "ROC-AUC": "0.9674 +- 0.0071",
+      "PR-AUC": "0.9868 +- 0.0025",
+      "raw_acc": 0.9051743082609128,
+      "raw_f1": 0.8862301270788793,
+      "raw_auc": 0.9673822341647803
+    },
+    {
+      "Model Architecture": "YAMNet + PCA + SVM (RBF)",
+      "Accuracy": "89.82% +- 1.15%",
+      "F1 (Macro)": "87.61% +- 1.54%",
+      "F1 (Weighted)": "89.61% +- 1.23%",
+      "Precision (Macro)": "89.38% +- 1.34%",
+      "Recall (Macro)": "86.41% +- 2.01%",
+      "ROC-AUC": "0.9644 +- 0.0114",
+      "PR-AUC": "0.9833 +- 0.0096",
+      "raw_acc": 0.8981620217760463,
+      "raw_f1": 0.8760660661649877,
+      "raw_auc": 0.9644215692859388
+    },
+    {
+      "Model Architecture": "YAMNet + PCA + k-NN (k=5)",
+      "Accuracy": "89.25% +- 0.95%",
+      "F1 (Macro)": "86.82% +- 1.16%",
+      "F1 (Weighted)": "88.98% +- 0.97%",
+      "Precision (Macro)": "89.05% +- 1.51%",
+      "Recall (Macro)": "85.37% +- 1.49%",
+      "ROC-AUC": "0.9291 +- 0.0137",
+      "PR-AUC": "0.9483 +- 0.0123",
+      "raw_acc": 0.8924982519228848,
+      "raw_f1": 0.8681847093167109,
+      "raw_auc": 0.9290981516514105
+    },
+    {
+      "Model Architecture": "YAMNet + PCA + Logistic Regression",
+      "Accuracy": "83.46% +- 2.23%",
+      "F1 (Macro)": "77.80% +- 3.95%",
+      "F1 (Weighted)": "82.09% +- 2.91%",
+      "Precision (Macro)": "84.96% +- 1.94%",
+      "Recall (Macro)": "75.47% +- 4.04%",
+      "ROC-AUC": "0.9101 +- 0.0231",
+      "PR-AUC": "0.9465 +- 0.0227",
+      "raw_acc": 0.8345519928079114,
+      "raw_f1": 0.7780356567590122,
+      "raw_auc": 0.9101134634451414
+    },
+    {
+      "Model Architecture": "YAMNet + Distance Anomaly Detector (Calibrated)",
+      "Accuracy": "54.87% +- 3.78%",
+      "F1 (Macro)": "54.66% +- 3.81%",
+      "F1 (Weighted)": "55.50% +- 3.91%",
+      "Precision (Macro)": "61.45% +- 4.20%",
+      "Recall (Macro)": "62.12% +- 4.39%",
+      "ROC-AUC": "0.7016 +- 0.0383",
+      "PR-AUC": "0.8300 +- 0.0322",
+      "raw_acc": 0.5486764558985117,
+      "raw_f1": 0.5466382226925661,
+      "raw_auc": 0.7015835886892844
+    }
+  ],
+  "10_fold_leaderboard": [
+    {
+      "Model Architecture": "Hybrid (YAMNet + Spectral) + SVM (RBF)",
+      "Accuracy": "95.47% +- 2.18%",
+      "F1 (Macro)": "94.89% +- 2.39%",
+      "F1 (Weighted)": "95.55% +- 2.11%",
+      "Precision (Macro)": "93.85% +- 2.70%",
+      "Recall (Macro)": "96.48% +- 1.70%",
+      "ROC-AUC": "0.9959 +- 0.0029",
+      "PR-AUC": "0.9983 +- 0.0012",
+      "raw_acc": 0.9546881287726359,
+      "raw_f1": 0.9489308252678355,
+      "raw_auc": 0.9959288585564096
+    },
+    {
+      "Model Architecture": "Hybrid (YAMNet + Spectral) + Gradient Boosting",
+      "Accuracy": "95.33% +- 2.00%",
+      "F1 (Macro)": "94.60% +- 2.37%",
+      "F1 (Weighted)": "95.36% +- 2.02%",
+      "Precision (Macro)": "94.09% +- 2.20%",
+      "Recall (Macro)": "95.37% +- 2.82%",
+      "ROC-AUC": "0.9935 +- 0.0049",
+      "PR-AUC": "0.9974 +- 0.0020",
+      "raw_acc": 0.9533199195171026,
+      "raw_f1": 0.9459947949186646,
+      "raw_auc": 0.9935266476720559
+    },
+    {
+      "Model Architecture": "Hybrid (YAMNet + Spectral) + Random Forest",
+      "Accuracy": "94.90% +- 1.71%",
+      "F1 (Macro)": "94.18% +- 1.91%",
+      "F1 (Weighted)": "94.96% +- 1.67%",
+      "Precision (Macro)": "93.51% +- 2.22%",
+      "Recall (Macro)": "95.32% +- 1.98%",
+      "ROC-AUC": "0.9878 +- 0.0058",
+      "PR-AUC": "0.9952 +- 0.0022",
+      "raw_acc": 0.9490342052313883,
+      "raw_f1": 0.9417665595009185,
+      "raw_auc": 0.9878489707571341
+    },
+    {
+      "Model Architecture": "YAMNet + PCA + Extra Trees",
+      "Accuracy": "92.92% +- 2.84%",
+      "F1 (Macro)": "91.75% +- 3.33%",
+      "F1 (Weighted)": "92.94% +- 2.83%",
+      "Precision (Macro)": "91.67% +- 3.60%",
+      "Recall (Macro)": "91.96% +- 3.22%",
+      "ROC-AUC": "0.9737 +- 0.0144",
+      "PR-AUC": "0.9893 +- 0.0062",
+      "raw_acc": 0.9292152917505032,
+      "raw_f1": 0.9174517761197482,
+      "raw_auc": 0.9736964672232531
+    },
+    {
+      "Model Architecture": "YAMNet + PCA + Gradient Boosting",
+      "Accuracy": "92.50% +- 2.22%",
+      "F1 (Macro)": "91.16% +- 2.60%",
+      "F1 (Weighted)": "92.48% +- 2.22%",
+      "Precision (Macro)": "91.53% +- 2.77%",
+      "Recall (Macro)": "91.01% +- 2.76%",
+      "ROC-AUC": "0.9707 +- 0.0151",
+      "PR-AUC": "0.9883 +- 0.0061",
+      "raw_acc": 0.924969818913481,
+      "raw_f1": 0.9116234262226502,
+      "raw_auc": 0.970703573637247
+    },
+    {
+      "Model Architecture": "YAMNet + PCA + Random Forest",
+      "Accuracy": "92.36% +- 3.53%",
+      "F1 (Macro)": "91.13% +- 4.11%",
+      "F1 (Weighted)": "92.39% +- 3.52%",
+      "Precision (Macro)": "90.92% +- 4.20%",
+      "Recall (Macro)": "91.57% +- 4.16%",
+      "ROC-AUC": "0.9714 +- 0.0117",
+      "PR-AUC": "0.9885 +- 0.0048",
+      "raw_acc": 0.9235814889336016,
+      "raw_f1": 0.9113048178016385,
+      "raw_auc": 0.9713617589893101
+    },
+    {
+      "Model Architecture": "YAMNet + PCA + SVM (RBF)",
+      "Accuracy": "90.39% +- 2.78%",
+      "F1 (Macro)": "88.29% +- 3.67%",
+      "F1 (Weighted)": "90.18% +- 2.98%",
+      "Precision (Macro)": "90.02% +- 2.99%",
+      "Recall (Macro)": "87.37% +- 4.45%",
+      "ROC-AUC": "0.9665 +- 0.0191",
+      "PR-AUC": "0.9844 +- 0.0145",
+      "raw_acc": 0.9039235412474849,
+      "raw_f1": 0.88294397086378,
+      "raw_auc": 0.9665449134199134
+    },
+    {
+      "Model Architecture": "YAMNet + PCA + k-NN (k=5)",
+      "Accuracy": "88.83% +- 2.97%",
+      "F1 (Macro)": "86.22% +- 3.93%",
+      "F1 (Weighted)": "88.51% +- 3.19%",
+      "Precision (Macro)": "88.53% +- 3.23%",
+      "Recall (Macro)": "84.97% +- 4.80%",
+      "ROC-AUC": "0.9370 +- 0.0269",
+      "PR-AUC": "0.9546 +- 0.0217",
+      "raw_acc": 0.8883299798792758,
+      "raw_f1": 0.8622039809757405,
+      "raw_auc": 0.9369816514268047
+    },
+    {
+      "Model Architecture": "YAMNet + PCA + Logistic Regression",
+      "Accuracy": "84.03% +- 3.05%",
+      "F1 (Macro)": "78.68% +- 4.79%",
+      "F1 (Weighted)": "82.74% +- 3.70%",
+      "Precision (Macro)": "85.68% +- 3.47%",
+      "Recall (Macro)": "76.45% +- 5.14%",
+      "ROC-AUC": "0.9120 +- 0.0315",
+      "PR-AUC": "0.9479 +- 0.0283",
+      "raw_acc": 0.8402816901408452,
+      "raw_f1": 0.7868055987177639,
+      "raw_auc": 0.9120394911211237
+    },
+    {
+      "Model Architecture": "YAMNet + Distance Anomaly Detector (Calibrated)",
+      "Accuracy": "54.86% +- 6.14%",
+      "F1 (Macro)": "54.68% +- 5.90%",
+      "F1 (Weighted)": "54.92% +- 6.58%",
+      "Precision (Macro)": "63.21% +- 4.96%",
+      "Recall (Macro)": "63.41% +- 5.31%",
+      "ROC-AUC": "0.7079 +- 0.0371",
+      "PR-AUC": "0.8436 +- 0.0298",
+      "raw_acc": 0.5486116700201207,
+      "raw_f1": 0.5467990874267541,
+      "raw_auc": 0.7078674408074918
+    }
+  ],
+  "multiclass_diagnosis": {
+    "Fault_1": {
+      "precision": 0.9,
+      "recall": 0.24324324324324326,
+      "f1-score": 0.3829787234042553,
+      "support": 37.0
+    },
+    "Fault_10": {
+      "precision": 0.8548387096774194,
+      "recall": 0.8983050847457628,
+      "f1-score": 0.8760330578512396,
+      "support": 59.0
+    },
+    "Fault_11": {
+      "precision": 0.8421052631578947,
+      "recall": 0.8648648648648649,
+      "f1-score": 0.8533333333333334,
+      "support": 37.0
+    },
+    "Fault_2": {
+      "precision": 1.0,
+      "recall": 0.7948717948717948,
+      "f1-score": 0.8857142857142857,
+      "support": 39.0
+    },
+    "Fault_3": {
+      "precision": 0.8,
+      "recall": 0.9882352941176471,
+      "f1-score": 0.8842105263157894,
+      "support": 85.0
+    },
+    "Fault_4": {
+      "precision": 0.9464285714285714,
+      "recall": 0.9137931034482759,
+      "f1-score": 0.9298245614035088,
+      "support": 58.0
+    },
+    "Fault_5": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 49.0
+    },
+    "Fault_7": {
+      "precision": 0.8604651162790697,
+      "recall": 0.6607142857142857,
+      "f1-score": 0.7474747474747475,
+      "support": 56.0
+    },
+    "Frets": {
+      "precision": 0.8571428571428571,
+      "recall": 0.5454545454545454,
+      "f1-score": 0.6666666666666666,
+      "support": 11.0
+    },
+    "General_Test": {
+      "precision": 0.9666666666666667,
+      "recall": 0.9666666666666667,
+      "f1-score": 0.9666666666666667,
+      "support": 30.0
+    },
+    "Healthy_Baseline": {
+      "precision": 0.8504672897196262,
+      "recall": 0.994535519125683,
+      "f1-score": 0.9168765743073047,
+      "support": 183.0
+    },
+    "Noise": {
+      "precision": 0.75,
+      "recall": 0.6,
+      "f1-score": 0.6666666666666666,
+      "support": 5.0
+    },
+    "Phone_Fault": {
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.8,
+      "support": 6.0
+    },
+    "Phone_Healthy": {
+      "precision": 0.9459459459459459,
+      "recall": 1.0,
+      "f1-score": 0.9722222222222222,
+      "support": 35.0
+    },
+    "Test_Pluck": {
+      "precision": 0.9411764705882353,
+      "recall": 0.9411764705882353,
+      "f1-score": 0.9411764705882353,
+      "support": 17.0
+    },
+    "accuracy": 0.8811881188118812,
+    "macro avg": {
+      "precision": 0.9010157927070858,
+      "recall": 0.8052351693005114,
+      "f1-score": 0.832656300174328,
+      "support": 707.0
+    },
+    "weighted avg": {
+      "precision": 0.8866965711706734,
+      "recall": 0.8811881188118812,
+      "f1-score": 0.868743304603796,
+      "support": 707.0
+    }
+  }
+}
