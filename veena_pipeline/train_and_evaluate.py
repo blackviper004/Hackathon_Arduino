@@ -246,7 +246,17 @@ def extract_yamnet_embeddings(all_segments):
             s1_err = -100.0
             detuning_trigger = 0.0
 
-        pitch_features.append([f0_val, min_cents, s1_err, detuning_trigger])
+        # Acoustic Structural Features (Research-derived)
+        # 1. Energy Decay Rate (dRMS/dt): differentiates healthy decay from Fret Wear (Fault 4) & Bridge Tilt (Fault 5)
+        rms_onset = float(np.sqrt(np.mean(audio[:int(0.3 * TARGET_SR)] ** 2)))
+        rms_tail = float(np.sqrt(np.mean(audio[int(1.2 * TARGET_SR):] ** 2)))
+        decay_rate = float((rms_onset - rms_tail) / (rms_onset + 1e-6))
+
+        # 2. High-Frequency Spectral Flatness (>2000 Hz): captures chaotic noise from String Buzzing (Fault 7)
+        stft_hf = np.abs(librosa.stft(audio, n_fft=2048, hop_length=512))[256:, :] # >2000 Hz bins
+        flatness_hf = float(np.mean(librosa.feature.spectral_flatness(S=stft_hf)))
+
+        pitch_features.append([f0_val, min_cents, s1_err, detuning_trigger, decay_rate, flatness_hf])
 
         if (idx + 1) % 150 == 0 or (idx + 1) == len(all_segments):
             print(f"  Processed {idx + 1}/{len(all_segments)} segments ({(idx + 1)/len(all_segments)*100:.1f}%)")
