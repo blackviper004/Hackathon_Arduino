@@ -1,175 +1,49 @@
 {
-  "dataset_summary": {
-    "total_segments": 707,
-    "total_healthy_segments": 218,
-    "total_anomaly_segments": 489,
-    "categories": {
-      "Phase1_Healthy": 183,
-      "Fault3": 85,
-      "Fault10": 59,
-      "Fault4": 58,
-      "Fault7": 56,
-      "Fault5": 49,
-      "Fault2": 39,
-      "Fault1": 37,
-      "Fault11": 37,
-      "Phone_Healthy": 35,
-      "General_Test": 30,
-      "Test_Audio": 17,
-      "Frets": 11,
-      "Phone_Fault": 6,
-      "Noise": 5
-    },
-    "devices": {
-      "Primary_Mic": 666,
-      "Phone_Mic": 41
+  "metadata": {
+    "total_segments": 702,
+    "total_unique_files": 128,
+    "class_distribution": {
+      "Healthy": 218,
+      "Detuned_Strings": 43,
+      "Quality_Issues": 441
     }
   },
-  "k_fold_5_metrics": [
+  "metrics_summary": [
     {
-      "Model": "Distance-Based Anomaly Detector",
-      "Accuracy": "55.29% +- 3.58%",
-      "F1 (Macro)": "55.07% +- 3.67%",
-      "F1 (Weighted)": "56.09% +- 3.43%",
-      "Precision (Macro)": "61.38% +- 4.52%",
-      "Recall (Macro)": "62.18% +- 4.68%",
-      "ROC-AUC": "0.7017 +- 0.0381",
-      "PR-AUC": "0.8304 +- 0.0317"
+      "Model": "Hybrid ML + Physics Pitch Gate",
+      "Accuracy": "98.00% +- 2.61%",
+      "F1 (Macro)": "94.74% +- 8.95%",
+      "Precision (Macro)": "96.22% +- 6.49%",
+      "Recall (Macro)": "94.13% +- 9.77%",
+      "raw_acc": 0.9800101317122595,
+      "raw_f1": 0.9474406099495795
     },
     {
-      "Model": "SVM (RBF Kernel)",
-      "Accuracy": "89.82% +- 1.15%",
-      "F1 (Macro)": "87.61% +- 1.54%",
-      "F1 (Weighted)": "89.61% +- 1.23%",
-      "Precision (Macro)": "89.38% +- 1.34%",
-      "Recall (Macro)": "86.41% +- 2.01%",
-      "ROC-AUC": "0.9644 +- 0.0114",
-      "PR-AUC": "0.9833 +- 0.0096"
+      "Model": "Gradient Boosting (Balanced)",
+      "Accuracy": "98.00% +- 2.61%",
+      "F1 (Macro)": "94.74% +- 8.95%",
+      "Precision (Macro)": "96.22% +- 6.49%",
+      "Recall (Macro)": "94.13% +- 9.77%",
+      "raw_acc": 0.9800101317122595,
+      "raw_f1": 0.9474406099495795
     },
     {
-      "Model": "Random Forest Classifier",
-      "Accuracy": "90.66% +- 2.91%",
-      "F1 (Macro)": "88.88% +- 3.52%",
-      "F1 (Weighted)": "90.59% +- 2.93%",
-      "Precision (Macro)": "89.57% +- 3.70%",
-      "Recall (Macro)": "88.39% +- 3.46%",
-      "ROC-AUC": "0.9670 +- 0.0099",
-      "PR-AUC": "0.9865 +- 0.0039"
+      "Model": "SVM (RBF Kernel Balanced)",
+      "Accuracy": "89.16% +- 4.43%",
+      "F1 (Macro)": "68.82% +- 9.98%",
+      "Precision (Macro)": "73.21% +- 14.08%",
+      "Recall (Macro)": "67.59% +- 8.71%",
+      "raw_acc": 0.8916413373860183,
+      "raw_f1": 0.6882172976112173
     },
     {
-      "Model": "Logistic Regression",
-      "Accuracy": "83.46% +- 2.23%",
-      "F1 (Macro)": "77.80% +- 3.95%",
-      "F1 (Weighted)": "82.09% +- 2.91%",
-      "Precision (Macro)": "84.96% +- 1.94%",
-      "Recall (Macro)": "75.47% +- 4.04%",
-      "ROC-AUC": "0.9101 +- 0.0231",
-      "PR-AUC": "0.9465 +- 0.0227"
-    },
-    {
-      "Model": "k-Nearest Neighbors (k-NN)",
-      "Accuracy": "89.25% +- 0.95%",
-      "F1 (Macro)": "86.82% +- 1.16%",
-      "F1 (Weighted)": "88.98% +- 0.97%",
-      "Precision (Macro)": "89.05% +- 1.51%",
-      "Recall (Macro)": "85.37% +- 1.49%",
-      "ROC-AUC": "0.9291 +- 0.0137",
-      "PR-AUC": "0.9483 +- 0.0123"
-    },
-    {
-      "Model": "Gradient Boosting Classifier",
-      "Accuracy": "90.52% +- 2.05%",
-      "F1 (Macro)": "88.62% +- 2.48%",
-      "F1 (Weighted)": "90.40% +- 2.07%",
-      "Precision (Macro)": "89.68% +- 2.66%",
-      "Recall (Macro)": "87.80% +- 2.43%",
-      "ROC-AUC": "0.9674 +- 0.0071",
-      "PR-AUC": "0.9868 +- 0.0025"
+      "Model": "Random Forest (Balanced)",
+      "Accuracy": "93.59% +- 2.79%",
+      "F1 (Macro)": "67.87% +- 5.14%",
+      "Precision (Macro)": "81.26% +- 17.11%",
+      "Recall (Macro)": "68.59% +- 2.83%",
+      "raw_acc": 0.9358662613981764,
+      "raw_f1": 0.6786842034128578
     }
-  ],
-  "k_fold_10_metrics": [
-    {
-      "Model": "Distance-Based Anomaly Detector",
-      "Accuracy": "55.14% +- 6.76%",
-      "F1 (Macro)": "54.93% +- 6.56%",
-      "F1 (Weighted)": "55.21% +- 7.34%",
-      "Precision (Macro)": "63.26% +- 5.82%",
-      "Recall (Macro)": "63.60% +- 6.03%",
-      "ROC-AUC": "0.7067 +- 0.0379",
-      "PR-AUC": "0.8398 +- 0.0299"
-    },
-    {
-      "Model": "SVM (RBF Kernel)",
-      "Accuracy": "90.39% +- 2.78%",
-      "F1 (Macro)": "88.29% +- 3.67%",
-      "F1 (Weighted)": "90.18% +- 2.98%",
-      "Precision (Macro)": "90.02% +- 2.99%",
-      "Recall (Macro)": "87.37% +- 4.45%",
-      "ROC-AUC": "0.9665 +- 0.0191",
-      "PR-AUC": "0.9844 +- 0.0145"
-    },
-    {
-      "Model": "Random Forest Classifier",
-      "Accuracy": "92.50% +- 3.40%",
-      "F1 (Macro)": "91.30% +- 3.97%",
-      "F1 (Weighted)": "92.54% +- 3.39%",
-      "Precision (Macro)": "91.09% +- 4.07%",
-      "Recall (Macro)": "91.79% +- 4.16%",
-      "ROC-AUC": "0.9719 +- 0.0123",
-      "PR-AUC": "0.9886 +- 0.0052"
-    },
-    {
-      "Model": "Logistic Regression",
-      "Accuracy": "84.03% +- 3.05%",
-      "F1 (Macro)": "78.68% +- 4.79%",
-      "F1 (Weighted)": "82.74% +- 3.70%",
-      "Precision (Macro)": "85.68% +- 3.47%",
-      "Recall (Macro)": "76.45% +- 5.14%",
-      "ROC-AUC": "0.9120 +- 0.0315",
-      "PR-AUC": "0.9479 +- 0.0283"
-    },
-    {
-      "Model": "k-Nearest Neighbors (k-NN)",
-      "Accuracy": "88.83% +- 2.97%",
-      "F1 (Macro)": "86.22% +- 3.93%",
-      "F1 (Weighted)": "88.51% +- 3.19%",
-      "Precision (Macro)": "88.53% +- 3.23%",
-      "Recall (Macro)": "84.97% +- 4.80%",
-      "ROC-AUC": "0.9370 +- 0.0269",
-      "PR-AUC": "0.9546 +- 0.0217"
-    },
-    {
-      "Model": "Gradient Boosting Classifier",
-      "Accuracy": "92.50% +- 2.22%",
-      "F1 (Macro)": "91.16% +- 2.60%",
-      "F1 (Weighted)": "92.48% +- 2.22%",
-      "Precision (Macro)": "91.53% +- 2.77%",
-      "Recall (Macro)": "91.01% +- 2.76%",
-      "ROC-AUC": "0.9707 +- 0.0151",
-      "PR-AUC": "0.9883 +- 0.0061"
-    }
-  ],
-  "multiclass_metrics": {
-    "categories": [
-      "Fault1",
-      "Fault10",
-      "Fault11",
-      "Fault2",
-      "Fault3",
-      "Fault4",
-      "Fault5",
-      "Fault7",
-      "Frets",
-      "General_Test",
-      "Noise",
-      "Phase1_Healthy",
-      "Phone_Fault",
-      "Phone_Healthy",
-      "Test_Audio"
-    ],
-    "rf_accuracy": 0.7340876944837341,
-    "rf_f1_macro": 0.6215195823136206,
-    "svm_accuracy": 0.5827439886845828,
-    "svm_f1_macro": 0.4299877627517003
-  }
+  ]
 }
