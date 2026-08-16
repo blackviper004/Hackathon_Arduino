@@ -150,31 +150,6 @@ with tab_live_ai:
             st.session_state.prev_engine_state = backend.state
             st.rerun()
 
-    # --- 1B. UPLOAD & EVALUATE OFFLINE DATASET FILES ---
-    with st.expander("📤 **Upload & Evaluate Veena Recording (.wav / .csv)**", expanded=False):
-        st.caption("Upload pre-recorded Veena audio or piezo sensor data to run instant diagnostic & tuning analysis without hardware.")
-        up_col1, up_col2 = st.columns(2)
-        with up_col1:
-            uploaded_wav = st.file_uploader("Upload Audio (.wav)", type=["wav"], key="upload_wav_file")
-        with up_col2:
-            uploaded_csv = st.file_uploader("Upload Piezo (.csv)", type=["csv"], key="upload_csv_file")
-
-        if uploaded_wav or uploaded_csv:
-            if st.button("🚀 Process & Run Diagnostics", use_container_width=True, key="btn_process_upload"):
-                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                upload_prefix = f"Rec_Upload_{ts}"
-                if uploaded_wav:
-                    wav_dest = os.path.join(DATA_DIR, f"{upload_prefix}_audio.wav")
-                    with open(wav_dest, "wb") as f:
-                        f.write(uploaded_wav.getbuffer())
-                if uploaded_csv:
-                    csv_dest = os.path.join(DATA_DIR, f"{upload_prefix}_piezo.csv")
-                    with open(csv_dest, "wb") as f:
-                        f.write(uploaded_csv.getbuffer())
-                st.toast(f"Saved and queued {upload_prefix} for analysis!", icon="🎉")
-                time.sleep(0.3)
-                st.rerun()
-
     is_live = backend.state in ("RECORDING", "PAUSED", "STOPPING")
 
     # --- INVISIBLE DATA BUS BRIDGE (LocalStorage Sync) ---
@@ -592,81 +567,62 @@ with tab_live_ai:
     render_veena_diagnostics()
     st.markdown("---")
 
-    st.subheader("🧠 Real-Time AI Diagnostic & Anomaly Center")
-
-    @st.fragment(
-        run_every=AI_REFRESH_SEC if backend.state == "RECORDING" else None
-    )
-    def render_ai_diagnostics():
-        if os.path.exists(DATA_DIR):
-            valid_files = [
-                f
-                for f in os.listdir(DATA_DIR)
-                if f.endswith("_piezo.csv") or f.endswith("_audio.wav")
-            ]
-            all_recordings = sorted(
-                [
-                    f.replace("_piezo.csv", "").replace("_audio.wav", "")
-                    for f in valid_files
-                ],
-                reverse=True,
-            )
-            unique_prefixes = sorted(list(set(all_recordings)), reverse=True)
-        else:
-            unique_prefixes = []
-
-        if unique_prefixes:
-            latest_prefix = unique_prefixes[0]
-
-            # Non-blocking state cache for AI inference
-            cache_key = f"ai_res_{latest_prefix}"
-            now_time = time.time()
-
-            if (
-                cache_key not in st.session_state
-                or (now_time - st.session_state.get(f"{cache_key}_ts", 0)) > 3.5
-            ):
-                st.session_state[cache_key] = backend.analyze_recording_ai(
-                    latest_prefix
-                )
-                st.session_state[f"{cache_key}_ts"] = now_time
-
-            ai_results = st.session_state[cache_key]
-
-            with st.container(border=True):
-                col_ai1, col_ai2, col_ai3 = st.columns(3)
-
-                status_color_text = ai_results.get("status", "UNKNOWN")
-                with col_ai1:
-                    st.markdown(
-                        f"**Diagnostic Status**\n### {status_color_text}"
-                    )
-                with col_ai2:
-                    score = ai_results.get("score", 0.0)
-                    st.metric("Anomaly Score (0-1)", f"{score:.3f}")
-                    st.progress(min(1.0, max(0.0, score)))
-                with col_ai3:
-                    conf = ai_results.get("confidence", 0)
-                    st.metric("Confidence Level", f"{conf}%")
-                    st.progress(min(1.0, max(0.0, conf / 100.0)))
-
-                st.caption(f"Target Session Evaluated: `📄 {latest_prefix}`")
-
-                with st.expander(
-                    "🔍 Expand Full AI Diagnostic Report & Telemetry Metrics"
-                ):
-                    st.json(ai_results)
-        else:
-            with st.container(border=True):
-                st.info(
-                    "💡 **AI Engine Standing By:** Record a session using the"
-                    " control deck above to trigger background feature"
-                    " extraction and live classification."
-                )
-
-    render_ai_diagnostics()
-
-    st.markdown("---")
+    # --- (Original Generic AI Anomaly Center commented out) ---
+    # st.subheader("🧠 Real-Time AI Diagnostic & Anomaly Center")
+    # @st.fragment(
+    #     run_every=AI_REFRESH_SEC if backend.state == "RECORDING" else None
+    # )
+    # def render_ai_diagnostics():
+    #     if os.path.exists(DATA_DIR):
+    #         valid_files = [
+    #             f
+    #             for f in os.listdir(DATA_DIR)
+    #             if f.endswith("_piezo.csv") or f.endswith("_audio.wav")
+    #         ]
+    #         all_recordings = sorted(
+    #             [
+    #                 f.replace("_piezo.csv", "").replace("_audio.wav", "")
+    #                 for f in valid_files
+    #             ],
+    #             reverse=True,
+    #         )
+    #         unique_prefixes = sorted(list(set(all_recordings)), reverse=True)
+    #     else:
+    #         unique_prefixes = []
+    #     if unique_prefixes:
+    #         latest_prefix = unique_prefixes[0]
+    #         cache_key = f"ai_res_{latest_prefix}"
+    #         now_time = time.time()
+    #         if (
+    #             cache_key not in st.session_state
+    #             or (now_time - st.session_state.get(f"{cache_key}_ts", 0)) > 3.5
+    #         ):
+    #             st.session_state[cache_key] = backend.analyze_recording_ai(
+    #                 latest_prefix
+    #             )
+    #             st.session_state[f"{cache_key}_ts"] = now_time
+    #         ai_results = st.session_state[cache_key]
+    #         with st.container(border=True):
+    #             col_ai1, col_ai2, col_ai3 = st.columns(3)
+    #             status_color_text = ai_results.get("status", "UNKNOWN")
+    #             with col_ai1:
+    #                 st.markdown(f"**Diagnostic Status**\n### {status_color_text}")
+    #             with col_ai2:
+    #                 score = ai_results.get("score", 0.0)
+    #                 st.metric("Anomaly Score (0-1)", f"{score:.3f}")
+    #                 st.progress(min(1.0, max(0.0, score)))
+    #             with col_ai3:
+    #                 conf = ai_results.get("confidence", 0)
+    #                 st.metric("Confidence Level", f"{conf}%")
+    #                 st.progress(min(1.0, max(0.0, conf / 100.0)))
+    #             st.caption(f"Target Session Evaluated: `📄 {latest_prefix}`")
+    #             with st.expander("🔍 Expand Full AI Diagnostic Report & Telemetry Metrics"):
+    #                 st.json(ai_results)
+    #     else:
+    #         with st.container(border=True):
+    #             st.info("💡 **AI Engine Standing By:** Record a session using the control deck above.")
+    # render_ai_diagnostics()
+    # st.markdown("---")
 
     # --- 5. DUAL TELEMETRY MONITOR STATIONS ---
 

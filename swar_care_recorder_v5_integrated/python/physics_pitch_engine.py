@@ -539,7 +539,7 @@ class PhysicsPitchEngine:
             f0_hz=round(f0_hz, 2),
             cents_dev=round(cents_dev, 1),
             hz_dev=round(hz_dev, 3),
-            string_num=nearest,
+            string_num=best_nearest,
             string_name=string_name,
             target_hz=round(target_hz, 2),
             confidence=round(confidence, 3),
