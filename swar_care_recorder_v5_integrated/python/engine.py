@@ -20,7 +20,8 @@ from model import (
     ADC_REFERENCE_VOLTAGE,
     App,
     Bridge,
-    AnomalyDetectionModel
+    AnomalyDetectionModel,
+    VeenaDiagnosticModel,
 )
 
 
@@ -599,4 +600,45 @@ class SwarCareEngine:
             )
         return AnomalyDetectionModel.evaluate(
             self.recordings_dir, prefix, piezo_sr=self.PIEZO_SAMPLE_RATE_HZ
+        )
+
+    def analyze_veena_ai(
+        self,
+        prefix: str,
+        tonic_hz: float = 130.81,
+        cents_threshold: float = 15.0,
+        string_label: str = None,
+    ) -> dict:
+        """Parallel Veena diagnostic: tuning (Physics) + quality (ML) simultaneously.
+
+        While recording is live, scores the in-memory audio window so results
+        are available instantly without waiting for the WAV to be finalized.
+        Once stopped, falls back to reading the completed WAV from disk.
+
+        Args:
+            prefix:           Recording prefix (e.g. 'Rec_001_20260816_182200').
+            tonic_hz:         Sa (tonic) frequency in Hz. Default = C3 (130.81 Hz).
+            cents_threshold:  Tuning tolerance in cents. Default ±15 cents.
+            string_label:     Which string was plucked, e.g. 'S1'. None = auto-detect.
+
+        Returns:
+            dict with keys: status, is_healthy, tuning (physics result),
+            quality (ML result), tonic_hz, string_label.
+        """
+        if self.state in ("RECORDING", "PAUSED"):
+            audio_raw = self.get_recent_audio_raw_window()
+            return VeenaDiagnosticModel.evaluate_live(
+                audio_raw,
+                self.AUDIO_SAMPLE_RATE_HZ,
+                tonic_hz=tonic_hz,
+                cents_threshold=cents_threshold,
+                string_label=string_label,
+            )
+        return VeenaDiagnosticModel.evaluate(
+            self.recordings_dir,
+            prefix,
+            tonic_hz=tonic_hz,
+            cents_threshold=cents_threshold,
+            string_label=string_label,
+            audio_sr=self.AUDIO_SAMPLE_RATE_HZ,
         )

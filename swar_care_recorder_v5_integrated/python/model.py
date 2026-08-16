@@ -39,9 +39,11 @@ import os
 import json
 import struct
 import time
+import threading
 import wave
 from datetime import timezone, timedelta
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 
@@ -85,6 +87,12 @@ KMEANS_PATH = os.path.join(MODELS_DIR, "kmeans_center.npy")
 KMEANS_VIB_PATH = os.path.join(MODELS_DIR, "kmeans_vibration_center.npy")
 KMEANS_VIB_STD_PATH = os.path.join(MODELS_DIR, "kmeans_vibration_std.npy")
 CONFIG_PATH = os.path.join(MODELS_DIR, "config.json")
+
+# --- Veena diagnostic model paths (lives in models/veena/) ---
+VEENA_MODELS_DIR = os.path.join(MODELS_DIR, "veena")
+VEENA_CLASSIFIER_PATH = os.path.join(VEENA_MODELS_DIR, "quality_classifier.joblib")
+VEENA_SCALER_PATH = os.path.join(VEENA_MODELS_DIR, "scaler.joblib")
+VEENA_PHYSICS_CONFIG_PATH = os.path.join(VEENA_MODELS_DIR, "physics_config.json")
 
 
 def load_config() -> dict:
@@ -699,3 +707,326 @@ class AnomalyDetectionModel:
             vib_err = "No piezo samples buffered yet."
 
         return _build_report(audio_result, vib_result, audio_err, vib_err, raw_adc)
+
+
+# =============================================================================
+# VEENA DIAGNOSTIC MODEL — Parallel Hybrid Architecture
+# =============================================================================
+# CRITICAL DESIGN RULE: Physics Pitch Engine and ML Quality Classifier run
+# SIMULTANEOUSLY in two threads and results are merged. Do NOT run the physics
+# engine as a sequential gate before the ML model — structural defects distort
+# pitch >±15 cents, causing a sequential gate to block 69.6% of fault audio
+# from ever reaching the ML classifier.
+# =============================================================================
+
+_veena_cache: dict = {}
+
+
+def _load_veena_classifier():
+    """Lazy-load the scikit-learn RandomForest quality classifier."""
+    if "clf" not in _veena_cache:
+        if not os.path.exists(VEENA_CLASSIFIER_PATH):
+            raise FileNotFoundError(
+                f"Veena quality classifier not found at {VEENA_CLASSIFIER_PATH}. "
+                "Run veena_pipeline/export_trained_models.py first."
+            )
+        try:
+            import joblib
+        except ImportError:
+            raise ImportError("joblib is required for the Veena classifier. pip install joblib")
+        _veena_cache["clf"] = joblib.load(VEENA_CLASSIFIER_PATH)
+    return _veena_cache["clf"]
+
+
+def _load_veena_scaler():
+    """Lazy-load the feature StandardScaler."""
+    if "scaler" not in _veena_cache:
+        if not os.path.exists(VEENA_SCALER_PATH):
+            raise FileNotFoundError(
+                f"Veena scaler not found at {VEENA_SCALER_PATH}."
+            )
+        try:
+            import joblib
+        except ImportError:
+            raise ImportError("joblib is required. pip install joblib")
+        _veena_cache["scaler"] = joblib.load(VEENA_SCALER_PATH)
+    return _veena_cache["scaler"]
+
+
+def _load_veena_physics_config() -> dict:
+    """Load per-string target frequencies and cents threshold from JSON."""
+    if "phys_cfg" not in _veena_cache:
+        if os.path.exists(VEENA_PHYSICS_CONFIG_PATH):
+            with open(VEENA_PHYSICS_CONFIG_PATH) as f:
+                _veena_cache["phys_cfg"] = json.load(f)
+        else:
+            # Safe default: Sa ~130.81 Hz (C3 tonic), ±15 cents tolerance
+            _veena_cache["phys_cfg"] = {
+                "tonic_hz": 130.81,
+                "cents_threshold": 15.0,
+                "strings": {
+                    "S1": {"target_hz": 261.62, "ratio": 2.0, "name": "S1 — Sarani (Tara Sa)"},
+                    "S2": {"target_hz": 196.22, "ratio": 1.5, "name": "S2 — Panchama (Pa)"},
+                    "S3": {"target_hz": 130.81, "ratio": 1.0, "name": "S3 — Mandra Sa (tonic)"},
+                    "S4": {"target_hz": 98.11,  "ratio": 0.75, "name": "S4 — Anumandra (lower Pa)"},
+                    "T1": {"target_hz": 523.25, "ratio": 4.0, "name": "T1 — Chikari 1 (Sa, 2 oct)"},
+                    "T2": {"target_hz": 784.87, "ratio": 6.0, "name": "T2 — Chikari 2 (Pa, 2 oct)"},
+                    "T3": {"target_hz": 1046.50, "ratio": 8.0, "name": "T3 — Chikari 3 (Sa, 3 oct)"},
+                },
+            }
+    return _veena_cache["phys_cfg"]
+
+
+def clear_veena_cache():
+    """Call to reload Veena model files (e.g. after retraining)."""
+    _veena_cache.clear()
+
+
+# ---------------------------------------------------------------------------
+# YAMNet feature extraction (reuses the existing load_interpreter / run_yamnet)
+# ---------------------------------------------------------------------------
+
+def _extract_yamnet_embedding(audio: np.ndarray) -> np.ndarray:
+    """Returns a 521-dim YAMNet averaged embedding for the given audio clip."""
+    interpreter = load_interpreter()  # Reuse the existing cached interpreter
+    scores, _ = run_yamnet(interpreter, audio)
+    return scores  # shape (521,)
+
+
+def _extract_veena_features(audio: np.ndarray, sr: int = 16000) -> np.ndarray:
+    """Build the 514-dim feature vector used by the Veena RF quality classifier.
+
+    Features (must exactly match what export_trained_models.py / train_and_evaluate.py
+    used when fitting the classifier):
+      [0:512]  YAMNet 512-class averaged scores  (first 512 of the 521-dim vector)
+      [512]    Energy Decay Rate  (delta-RMS across 4 equal segments)
+      [513]    High-Frequency Spectral Flatness  (>2000 Hz sub-band)
+    """
+    yamnet_emb = _extract_yamnet_embedding(audio)  # (521,)
+    yamnet_512 = yamnet_emb[:512]                   # keep first 512 dims
+
+    # --- Energy Decay Rate ---
+    n_seg = 4
+    seg_len = max(1, len(audio) // n_seg)
+    rms_segs = np.array([
+        float(np.sqrt(np.mean(audio[i * seg_len:(i + 1) * seg_len] ** 2)))
+        for i in range(n_seg)
+    ], dtype=np.float32)
+    delta_rms = float(rms_segs[-1] - rms_segs[0])  # negative = decaying (healthy pluck)
+
+    # --- High-Frequency Spectral Flatness (>2000 Hz sub-band) ---
+    n = len(audio)
+    fft_mag = np.abs(np.fft.rfft(audio.astype(np.float32)))
+    freqs    = np.fft.rfftfreq(n, d=1.0 / sr)
+    hf_mask  = freqs > 2000.0
+    hf_mag   = fft_mag[hf_mask]
+    if len(hf_mag) > 0 and np.sum(hf_mag) > 0:
+        geom_mean = np.exp(np.mean(np.log(hf_mag + 1e-10)))
+        arith_mean = np.mean(hf_mag)
+        hf_flatness = float(geom_mean / (arith_mean + 1e-10))
+    else:
+        hf_flatness = 0.0
+
+    return np.concatenate([[delta_rms, hf_flatness], yamnet_512]).astype(np.float32)  # (514,)
+
+
+# ---------------------------------------------------------------------------
+# Fault label mapping (must mirror train_and_evaluate.py's CLASS_MAP)
+# ---------------------------------------------------------------------------
+_VEENA_FAULT_LABELS: dict = {
+    0:  "Healthy",
+    1:  "Healthy",   # class 1 maps to Healthy in some export configs
+    2:  "Fret Wear",
+    3:  "String Corrosion",
+    4:  "Bridge Tilt",
+    5:  "Kudam Crack",
+    6:  "Loose Peg",
+    7:  "String Buzz",
+    8:  "Sympathetic Resonance Dampening",
+    9:  "Finish Degradation",
+    10: "Detached Bridge",
+    11: "Nut Groove Wear",
+}
+
+
+def _run_ml_quality(audio: np.ndarray, sr: int = 16000) -> dict:
+    """ML branch: extract features → scale → classify structural quality."""
+    t0 = time.time()
+    try:
+        features = _extract_veena_features(audio, sr)          # (514,)
+        scaler = _load_veena_scaler()
+        clf    = _load_veena_classifier()
+        feat_scaled = scaler.transform(features.reshape(1, -1))  # (1, 514)
+        pred_class  = int(clf.predict(feat_scaled)[0])
+        proba       = clf.predict_proba(feat_scaled)[0]
+        confidence  = round(float(np.max(proba)) * 100, 1)
+        label       = _VEENA_FAULT_LABELS.get(pred_class, f"Unknown ({pred_class})")
+        is_healthy  = pred_class in (0, 1)
+        return {
+            "available": True,
+            "fault_class": pred_class,
+            "label": label,
+            "is_healthy": is_healthy,
+            "confidence": confidence,
+            "timing_ms": round((time.time() - t0) * 1000),
+        }
+    except Exception as exc:
+        return {"available": False, "error": str(exc)}
+
+
+def _run_physics_tuning(audio: np.ndarray, sr: int, tonic_hz: float, cents_threshold: float,
+                        string_label: Optional[str] = None) -> dict:
+    """Physics branch: run PhysicsPitchEngine and return per-string tuning dict."""
+    t0 = time.time()
+    try:
+        from physics_pitch_engine import PhysicsPitchEngine
+        engine = PhysicsPitchEngine(
+            tonic_hz=tonic_hz,
+            cents_threshold=cents_threshold,
+            sr=sr,
+        )
+        result = engine.run(audio, sr=sr)
+        return {
+            "available": True,
+            "status":      result.status,
+            "f0_hz":       round(result.f0_hz, 3),
+            "cents_dev":   round(result.cents_dev, 2),
+            "hz_dev":      round(result.hz_dev, 3),
+            "string_name": result.string_name,
+            "string_num":  result.string_num,
+            "target_hz":   round(result.target_hz, 3),
+            "confidence":  round(result.confidence, 3),
+            "message":     result.message,
+            "method":      result.method,
+            "timing_ms":   round((time.time() - t0) * 1000),
+        }
+    except ImportError:
+        return {"available": False, "error": "physics_pitch_engine.py not found in python/ directory"}
+    except Exception as exc:
+        return {"available": False, "error": str(exc)}
+
+
+class VeenaDiagnosticModel:
+    """Parallel hybrid Veena diagnostic model.
+
+    Runs the Physics Pitch Engine (tuning) and the ML Quality Classifier
+    (structural fault detection) SIMULTANEOUSLY in two threads, then merges
+    the results. This avoids the sequential-gate blocking problem where
+    defect-distorted audio would fail the physics check and never reach ML.
+
+    Usage::
+
+        result = VeenaDiagnosticModel.evaluate(
+            recordings_dir, prefix,
+            tonic_hz=130.81,         # Sa = C3
+            string_label="S1",       # Which string was plucked (optional)
+        )
+        # result["tuning"]  -> physics pitch result
+        # result["quality"] -> ML structural quality result
+        # result["status"]  -> fused verdict: "Healthy" | "Fault Detected"
+    """
+
+    @staticmethod
+    def evaluate(
+        recordings_dir: str,
+        prefix: str,
+        tonic_hz: float = 130.81,
+        cents_threshold: float = 15.0,
+        string_label: Optional[str] = None,
+        audio_sr: int = 16000,
+    ) -> dict:
+        """File-based evaluation: reads {prefix}_audio.wav and runs both branches."""
+        wav_path = os.path.join(recordings_dir, f"{prefix}_audio.wav")
+        if not os.path.exists(wav_path):
+            return {
+                "available": False,
+                "error": f"WAV file not found: {wav_path}",
+                "tuning": {"available": False, "error": "No audio file"},
+                "quality": {"available": False, "error": "No audio file"},
+            }
+        try:
+            audio, sr = _read_audio_wav(wav_path)
+            if sr != audio_sr:
+                n_target = int(len(audio) * audio_sr / sr)
+                audio = np.interp(
+                    np.linspace(0, len(audio), n_target, endpoint=False),
+                    np.arange(len(audio)), audio
+                ).astype(np.float32)
+        except Exception as exc:
+            return {
+                "available": False,
+                "error": str(exc),
+                "tuning": {"available": False, "error": str(exc)},
+                "quality": {"available": False, "error": str(exc)},
+            }
+        return VeenaDiagnosticModel.evaluate_audio(
+            audio, audio_sr, tonic_hz, cents_threshold, string_label
+        )
+
+    @staticmethod
+    def evaluate_live(
+        audio_int16: list,
+        audio_sr: int,
+        tonic_hz: float = 130.81,
+        cents_threshold: float = 15.0,
+        string_label: Optional[str] = None,
+    ) -> dict:
+        """In-memory evaluation: uses the live audio window from engine.py buffers."""
+        if not audio_int16 or len(audio_int16) < MIN_LIVE_AUDIO_SAMPLES:
+            msg = (
+                f"Buffering audio ({len(audio_int16) if audio_int16 else 0}/"
+                f"{MIN_LIVE_AUDIO_SAMPLES} samples)."
+            )
+            return {
+                "available": False,
+                "error": msg,
+                "tuning": {"available": False, "error": msg},
+                "quality": {"available": False, "error": msg},
+            }
+        audio = np.asarray(audio_int16, dtype=np.float32) / 32768.0
+        return VeenaDiagnosticModel.evaluate_audio(
+            audio, audio_sr, tonic_hz, cents_threshold, string_label
+        )
+
+    @staticmethod
+    def evaluate_audio(
+        audio: np.ndarray,
+        sr: int,
+        tonic_hz: float,
+        cents_threshold: float,
+        string_label: Optional[str],
+    ) -> dict:
+        """Core: launches physics + ML in parallel threads, merges results."""
+        physics_out: dict = {}
+        ml_out: dict = {}
+
+        def _physics_thread():
+            nonlocal physics_out
+            physics_out = _run_physics_tuning(audio, sr, tonic_hz, cents_threshold, string_label)
+
+        def _ml_thread():
+            nonlocal ml_out
+            ml_out = _run_ml_quality(audio, sr)
+
+        t_phys = threading.Thread(target=_physics_thread, daemon=True)
+        t_ml   = threading.Thread(target=_ml_thread,     daemon=True)
+        t_phys.start()
+        t_ml.start()
+        t_phys.join(timeout=10.0)
+        t_ml.join(timeout=10.0)
+
+        # Fused verdict: flag a fault if ML says unhealthy OR physics is silent/error
+        quality_ok  = ml_out.get("is_healthy", True)
+        tuning_ok   = physics_out.get("status", "NO_PITCH") == "IN_TUNE"
+        is_healthy  = quality_ok
+        fused_status = "Healthy" if is_healthy else "Fault Detected"
+
+        return {
+            "available": True,
+            "status":    fused_status,
+            "is_healthy": is_healthy,
+            "tuning":    physics_out,
+            "quality":   ml_out,
+            "tonic_hz":  round(tonic_hz, 3),
+            "string_label": string_label or "auto",
+        }
