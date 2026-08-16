@@ -1,0 +1,4 @@
+Model Architecture,Accuracy,F1 (Macro),raw_acc,raw_f1
+Random Forest (Balanced),97.93% +- 1.87%,91.42% +- 10.60%,0.9792507936507937,0.9142205814751158
+Gradient Boosting (Balanced),97.61% +- 2.95%,90.88% +- 11.43%,0.9760634920634921,0.9088170174523856
+SVM (RBF Kernel Balanced),97.77% +- 1.92%,90.76% +- 10.60%,0.9776761904761905,0.9075659974121582

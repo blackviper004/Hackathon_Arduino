@@ -1,0 +1,49 @@
+{
+  "metadata": {
+    "total_segments": 702,
+    "total_unique_files": 128,
+    "class_distribution": {
+      "Healthy": 218,
+      "Detuned_Strings": 43,
+      "Quality_Issues": 441
+    }
+  },
+  "metrics_summary": [
+    {
+      "Model": "Hybrid ML + Physics Pitch Gate",
+      "Accuracy": "98.00% +- 2.61%",
+      "F1 (Macro)": "94.74% +- 8.95%",
+      "Precision (Macro)": "96.22% +- 6.49%",
+      "Recall (Macro)": "94.13% +- 9.77%",
+      "raw_acc": 0.9800101317122595,
+      "raw_f1": 0.9474406099495795
+    },
+    {
+      "Model": "Gradient Boosting (Balanced)",
+      "Accuracy": "98.00% +- 2.61%",
+      "F1 (Macro)": "94.74% +- 8.95%",
+      "Precision (Macro)": "96.22% +- 6.49%",
+      "Recall (Macro)": "94.13% +- 9.77%",
+      "raw_acc": 0.9800101317122595,
+      "raw_f1": 0.9474406099495795
+    },
+    {
+      "Model": "SVM (RBF Kernel Balanced)",
+      "Accuracy": "89.16% +- 4.43%",
+      "F1 (Macro)": "68.82% +- 9.98%",
+      "Precision (Macro)": "73.21% +- 14.08%",
+      "Recall (Macro)": "67.59% +- 8.71%",
+      "raw_acc": 0.8916413373860183,
+      "raw_f1": 0.6882172976112173
+    },
+    {
+      "Model": "Random Forest (Balanced)",
+      "Accuracy": "93.59% +- 2.79%",
+      "F1 (Macro)": "67.87% +- 5.14%",
+      "Precision (Macro)": "81.26% +- 17.11%",
+      "Recall (Macro)": "68.59% +- 2.83%",
+      "raw_acc": 0.9358662613981764,
+      "raw_f1": 0.6786842034128578
+    }
+  ]
+}

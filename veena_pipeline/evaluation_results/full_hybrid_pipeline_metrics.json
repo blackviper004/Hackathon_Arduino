@@ -1,0 +1,47 @@
+{
+  "confusion_matrix_absolute": [
+    [
+      189,
+      25,
+      4
+    ],
+    [
+      13,
+      29,
+      1
+    ],
+    [
+      1,
+      307,
+      133
+    ]
+  ],
+  "confusion_matrix_percentage": [
+    [
+      86.7,
+      11.47,
+      1.83
+    ],
+    [
+      30.23,
+      67.44,
+      2.33
+    ],
+    [
+      0.23,
+      69.61,
+      30.16
+    ]
+  ],
+  "classes": [
+    "Healthy (Class 0)",
+    "Detuned Strings (Class 1)",
+    "Quality Issues (Class 2)"
+  ],
+  "metrics": {
+    "accuracy": 0.5,
+    "precision_macro": 0.6584,
+    "recall_macro": 0.6143,
+    "f1_macro": 0.5003
+  }
+}

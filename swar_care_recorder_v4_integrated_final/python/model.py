@@ -16,23 +16,17 @@ Pipeline (verified against the working reference Streamlit app):
                         -> Z-score normalized distance to learned center
                         -> healthy/watch/anomaly
 
-*** CRITICAL - UNRESOLVED CALIBRATION MISMATCH ***
-  extract_dsp_features()'s frequency features are sample-rate dependent.
-  kmeans_vibration_center.npy has a small nonzero "high_freq_ratio" (energy
-  above 1kHz) - that's only possible if the calibration data's Nyquist
-  frequency was above 1kHz, i.e. captured at well above 2kHz. Every place
-  this pipeline was assembled (the reference app's PC-emulation, the
-  calibration button) assumes the piezo stream is 16kHz. But engine.py's
-  real hardware constant is PIEZO_SAMPLE_RATE_HZ = 2000.
-  Confirmed empirically: scoring a real 2kHz recording at sr=2000 produces
-  wildly inflated distances (~21 vs a threshold of 4.5552) - a strong sign
-  of scale mismatch, not a real anomaly.
-  VIBRATION_SAMPLE_RATE_HZ below defaults to 16000 to match the calibration
-  evidence. If your real hardware only ever produces 2kHz piezo data, the
-  vibration model needs to be RECALIBRATED at 2kHz (record known-healthy
-  audio at the real hardware rate, run calibrate_vibration_baseline() on
-  it) - don't just flip this constant, the learned center/std were fit at
-  whatever rate the training data actually was.
+*** RESOLVED - 2kHz PIEZO HARDWARE ***
+  Vibration features (ZCR especially) are sample-rate dependent, so the piezo
+  model must always be calibrated and scored at the same rate. Engine.py's real
+  hardware rate is PIEZO_SAMPLE_RATE_HZ = 2000 (mic stays 16kHz for YAMNet
+  audio). Two coordinated fixes keep vibration scoring valid at 2kHz:
+    1. extract_dsp_features()'s ZCR is now expressed per-SECOND (rate-invariant),
+       so the feature set no longer silently breaks if the capture rate changes.
+    2. kmeans_vibration_center/std.npy were REGENERATED at 2000Hz from a
+       synthetic known-healthy distribution (recalibrate_vibration_2khz.py).
+  If you later recalibrate on your own real hardware, keep the sample rate at
+  2000 for both the calibration step and scoring.
 """
 
 import os
@@ -101,9 +95,17 @@ CONFIG = load_config()
 TARGET_SR = int(CONFIG.get("sample_rate", 16000))          # audio (YAMNet) rate
 WINDOW_SEC = float(CONFIG.get("window_seconds", 2.0))
 
+<<<<<<< HEAD
 # See "CRITICAL" note in module docstring - best-evidence default, verify against
 # your real piezo hardware rate before trusting vibration verdicts.
-VIBRATION_SAMPLE_RATE_HZ = int(CONFIG.get("vibration_sample_rate_hz", 16000))
+=======
+# Piezo hardware is confirmed at 2 kHz (model.py's feature extractor and the
+# deployed kmeans_vibration_*.npy baseline were regenerated to match). Engine.py
+# also passes its PIEZO_SAMPLE_RATE_HZ (2000) explicitly at call time, so this
+# value is the consistent default for any calibration/inference without an
+# explicit rate.
+>>>>>>> 43de0ad (Fix vibration model for 2 kHz piezo hardware)
+VIBRATION_SAMPLE_RATE_HZ = int(CONFIG.get("vibration_sample_rate_hz", 2000))
 
 
 # =============================================================================
@@ -265,7 +267,7 @@ def extract_dsp_features(waveform: np.ndarray, sr: int = TARGET_SR,
 
     Features:
         [0] RMS energy
-        [1] Zero Crossing Rate (ZCR)
+        [1] Zero Crossing Rate (ZCR) - crossings per SECOND (rate-invariant)
         [2] Spectral Centroid (Hz)
         [3] High-Frequency Energy Ratio (upper band of the spectrum)
         [4] Peak FFT Frequency (Hz)
@@ -282,7 +284,12 @@ def extract_dsp_features(waveform: np.ndarray, sr: int = TARGET_SR,
     rms = float(np.sqrt(np.mean(waveform ** 2)))
 
     zero_crossings = np.nonzero(np.diff(waveform > 0))[0]
-    zcr = float(len(zero_crossings) / len(waveform))
+    # RATE-INVARIANT zero-crossing rate: crossings per SECOND, not per sample.
+    # ZCR expressed per-sample (crossings / len) scales with 1/sample_rate, so the
+    # same physical vibration would score ~8x differently at 2 kHz vs 16 kHz.
+    # Expressing it as crossings/sec keeps this feature meaningful independently of
+    # the capture rate (matters now that the real piezo hardware runs at 2 kHz).
+    zcr = float(len(zero_crossings) / (len(waveform) / sr))
 
     n = len(waveform)
     fft_vals = np.fft.rfft(waveform)
