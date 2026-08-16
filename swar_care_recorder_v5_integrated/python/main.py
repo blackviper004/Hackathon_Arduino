@@ -150,6 +150,31 @@ with tab_live_ai:
             st.session_state.prev_engine_state = backend.state
             st.rerun()
 
+    # --- 1B. UPLOAD & EVALUATE OFFLINE DATASET FILES ---
+    with st.expander("📤 **Upload & Evaluate Veena Recording (.wav / .csv)**", expanded=False):
+        st.caption("Upload pre-recorded Veena audio or piezo sensor data to run instant diagnostic & tuning analysis without hardware.")
+        up_col1, up_col2 = st.columns(2)
+        with up_col1:
+            uploaded_wav = st.file_uploader("Upload Audio (.wav)", type=["wav"], key="upload_wav_file")
+        with up_col2:
+            uploaded_csv = st.file_uploader("Upload Piezo (.csv)", type=["csv"], key="upload_csv_file")
+
+        if uploaded_wav or uploaded_csv:
+            if st.button("🚀 Process & Run Diagnostics", use_container_width=True, key="btn_process_upload"):
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                upload_prefix = f"Rec_Upload_{ts}"
+                if uploaded_wav:
+                    wav_dest = os.path.join(DATA_DIR, f"{upload_prefix}_audio.wav")
+                    with open(wav_dest, "wb") as f:
+                        f.write(uploaded_wav.getbuffer())
+                if uploaded_csv:
+                    csv_dest = os.path.join(DATA_DIR, f"{upload_prefix}_piezo.csv")
+                    with open(csv_dest, "wb") as f:
+                        f.write(uploaded_csv.getbuffer())
+                st.toast(f"Saved and queued {upload_prefix} for analysis!", icon="🎉")
+                time.sleep(0.3)
+                st.rerun()
+
     is_live = backend.state in ("RECORDING", "PAUSED", "STOPPING")
 
     # --- INVISIBLE DATA BUS BRIDGE (LocalStorage Sync) ---
