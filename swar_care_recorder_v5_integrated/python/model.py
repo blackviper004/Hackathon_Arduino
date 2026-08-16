@@ -36,6 +36,14 @@ Pipeline (verified against the working reference Streamlit app):
 """
 
 import os
+import sys
+
+# Ensure this script's own directory is on sys.path so that
+# physics_pitch_engine.py (which lives alongside model.py) is always
+# importable regardless of the working directory Streamlit is launched from.
+_SELF_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SELF_DIR not in sys.path:
+    sys.path.insert(0, _SELF_DIR)
 import json
 import struct
 import time
@@ -793,59 +801,87 @@ def _extract_yamnet_embedding(audio: np.ndarray) -> np.ndarray:
     return scores  # shape (521,)
 
 
-def _extract_veena_features(audio: np.ndarray, sr: int = 16000) -> np.ndarray:
-    """Build the 514-dim feature vector used by the Veena RF quality classifier.
+_TARGET_F0S = np.array([146.83, 110.00, 73.42, 55.00], dtype=np.float32)
+_S1_F0 = 146.83
 
-    Features (must exactly match what export_trained_models.py / train_and_evaluate.py
-    used when fitting the classifier):
-      [0:512]  YAMNet 512-class averaged scores  (first 512 of the 521-dim vector)
-      [512]    Energy Decay Rate  (delta-RMS across 4 equal segments)
-      [513]    High-Frequency Spectral Flatness  (>2000 Hz sub-band)
+
+def _extract_veena_features(audio: np.ndarray, sr: int = 16000) -> np.ndarray:
+    """Build the 527-dim feature vector used by the Veena RF quality classifier.
+
+    Features (matching export_trained_models.py / train_and_evaluate.py):
+      [0:521]  YAMNet 521-class averaged scores
+      [521]    f0_val (autocorrelation fundamental frequency)
+      [522]    min_cents (minimum cents deviation from target strings)
+      [523]    s1_err (f0 deviation from S1)
+      [524]    detuning_trigger
+      [525]    decay_rate (Energy decay rate: onset vs tail)
+      [526]    flatness_hf (High-frequency spectral flatness >2000 Hz)
     """
     yamnet_emb = _extract_yamnet_embedding(audio)  # (521,)
-    yamnet_512 = yamnet_emb[:512]                   # keep first 512 dims
 
-    # --- Energy Decay Rate ---
-    n_seg = 4
-    seg_len = max(1, len(audio) // n_seg)
-    rms_segs = np.array([
-        float(np.sqrt(np.mean(audio[i * seg_len:(i + 1) * seg_len] ** 2)))
-        for i in range(n_seg)
-    ], dtype=np.float32)
-    delta_rms = float(rms_segs[-1] - rms_segs[0])  # negative = decaying (healthy pluck)
+    # 1. f0 autocorrelation & Cents deviation
+    try:
+        import librosa
+        r = librosa.autocorrelate(audio)
+    except Exception:
+        n_fft = 2 * len(audio)
+        f = np.fft.rfft(audio, n=n_fft)
+        corr_full = np.fft.irfft(f * np.conj(f), n=n_fft)
+        r = corr_full[:len(audio)]
 
-    # --- High-Frequency Spectral Flatness (>2000 Hz sub-band) ---
-    n = len(audio)
-    fft_mag = np.abs(np.fft.rfft(audio.astype(np.float32)))
-    freqs    = np.fft.rfftfreq(n, d=1.0 / sr)
-    hf_mask  = freqs > 2000.0
-    hf_mag   = fft_mag[hf_mask]
-    if len(hf_mag) > 0 and np.sum(hf_mag) > 0:
-        geom_mean = np.exp(np.mean(np.log(hf_mag + 1e-10)))
-        arith_mean = np.mean(hf_mag)
-        hf_flatness = float(geom_mean / (arith_mean + 1e-10))
+    min_lag, max_lag = int(sr / 400.0), int(sr / 45.0)
+    if len(r) > max_lag:
+        peak_lag = min_lag + np.argmax(r[min_lag:max_lag])
+        f0_val = float(sr / float(peak_lag)) if peak_lag > 0 else 0.0
     else:
-        hf_flatness = 0.0
+        f0_val = 0.0
 
-    return np.concatenate([[delta_rms, hf_flatness], yamnet_512]).astype(np.float32)  # (514,)
+    if f0_val > 30.0:
+        cents_err = np.abs(1200.0 * np.log2(f0_val / (_TARGET_F0S + 1e-9)))
+        min_cents = float(np.min(cents_err))
+        s1_err = float(f0_val - _S1_F0)
+        detuning_trigger = float((-25.0 <= s1_err <= -8.0) or (150.0 <= min_cents <= 400.0))
+    else:
+        min_cents = 1200.0
+        s1_err = -100.0
+        detuning_trigger = 0.0
+
+    # 2. Energy Decay Rate (dRMS/dt)
+    onset_end = max(1, int(0.3 * sr))
+    tail_start = int(1.2 * sr)
+    rms_onset = float(np.sqrt(np.mean(audio[:onset_end] ** 2)))
+    if len(audio) > tail_start:
+        rms_tail = float(np.sqrt(np.mean(audio[tail_start:] ** 2)))
+    else:
+        rms_tail = float(np.sqrt(np.mean(audio[-onset_end:] ** 2)))
+    decay_rate = float((rms_onset - rms_tail) / (rms_onset + 1e-6))
+
+    # 3. High-Frequency Spectral Flatness (>2000 Hz)
+    try:
+        import librosa
+        stft_hf = np.abs(librosa.stft(audio, n_fft=2048, hop_length=512))[256:, :]  # >2000 Hz bins
+        flatness_hf = float(np.mean(librosa.feature.spectral_flatness(S=stft_hf)))
+    except Exception:
+        fft_mag = np.abs(np.fft.rfft(audio.astype(np.float32), n=2048))
+        freqs = np.fft.rfftfreq(2048, d=1.0 / sr)
+        hf_mag = fft_mag[freqs > 2000.0]
+        if len(hf_mag) > 0 and np.sum(hf_mag) > 0:
+            geom_mean = np.exp(np.mean(np.log(hf_mag + 1e-10)))
+            arith_mean = np.mean(hf_mag)
+            flatness_hf = float(geom_mean / (arith_mean + 1e-10))
+        else:
+            flatness_hf = 0.0
+
+    pitch_feats = np.array([f0_val, min_cents, s1_err, detuning_trigger, decay_rate, flatness_hf], dtype=np.float32)
+    return np.concatenate([yamnet_emb, pitch_feats]).astype(np.float32)  # (527,)
 
 
 # ---------------------------------------------------------------------------
-# Fault label mapping (must mirror train_and_evaluate.py's CLASS_MAP)
+# Fault label mapping
 # ---------------------------------------------------------------------------
 _VEENA_FAULT_LABELS: dict = {
-    0:  "Healthy",
-    1:  "Healthy",   # class 1 maps to Healthy in some export configs
-    2:  "Fret Wear",
-    3:  "String Corrosion",
-    4:  "Bridge Tilt",
-    5:  "Kudam Crack",
-    6:  "Loose Peg",
-    7:  "String Buzz",
-    8:  "Sympathetic Resonance Dampening",
-    9:  "Finish Degradation",
-    10: "Detached Bridge",
-    11: "Nut Groove Wear",
+    0: "Healthy",
+    1: "Structural Defect Detected",
 }
 
 
@@ -853,15 +889,15 @@ def _run_ml_quality(audio: np.ndarray, sr: int = 16000) -> dict:
     """ML branch: extract features → scale → classify structural quality."""
     t0 = time.time()
     try:
-        features = _extract_veena_features(audio, sr)          # (514,)
+        features = _extract_veena_features(audio, sr)          # (527,)
         scaler = _load_veena_scaler()
         clf    = _load_veena_classifier()
-        feat_scaled = scaler.transform(features.reshape(1, -1))  # (1, 514)
+        feat_scaled = scaler.transform(features.reshape(1, -1))  # (1, 527)
         pred_class  = int(clf.predict(feat_scaled)[0])
         proba       = clf.predict_proba(feat_scaled)[0]
         confidence  = round(float(np.max(proba)) * 100, 1)
-        label       = _VEENA_FAULT_LABELS.get(pred_class, f"Unknown ({pred_class})")
-        is_healthy  = pred_class in (0, 1)
+        label       = _VEENA_FAULT_LABELS.get(pred_class, f"Defect (Class {pred_class})")
+        is_healthy  = (pred_class == 0)
         return {
             "available": True,
             "fault_class": pred_class,
@@ -900,8 +936,8 @@ def _run_physics_tuning(audio: np.ndarray, sr: int, tonic_hz: float, cents_thres
             "method":      result.method,
             "timing_ms":   round((time.time() - t0) * 1000),
         }
-    except ImportError:
-        return {"available": False, "error": "physics_pitch_engine.py not found in python/ directory"}
+    except ImportError as exc:
+        return {"available": False, "error": f"ImportError: {exc}"}
     except Exception as exc:
         return {"available": False, "error": str(exc)}
 
