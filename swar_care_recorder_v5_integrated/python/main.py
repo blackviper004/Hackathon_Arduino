@@ -82,11 +82,7 @@ st.title("🎵 SwarCare Anomaly Detection Hub")
 st.write("Real-Time Vibration & Audio Stream Intelligence")
 st.markdown("---")
 
-# Veena session state
-if "veena_tonic" not in st.session_state:
-    st.session_state.veena_tonic = "C3"
-if "veena_string" not in st.session_state:
-    st.session_state.veena_string = "S1"
+
 
 
 # Helper function to generate ZIP archive of all stored recordings in order
@@ -104,10 +100,10 @@ def generate_recordings_zip():
 
 
 # ==========================================
-# 📑 CONSOLIDATED 3-TAB INTERFACE
+# 📑 CONSOLIDATED 2-TAB INTERFACE
 # ==========================================
-tab_live_ai, tab_records, tab_veena = st.tabs(
-    ["📡 Live Telemetry & AI Diagnostics", "📁 Saved Records Explorer", "🎹 Veena Diagnostics"]
+tab_live_ai, tab_records = st.tabs(
+    ["📡 Live & Veena Diagnostics", "📁 Saved Records Explorer"]
 )
 
 LIVE_SYNC_SEC = 1.0 / 2.0  # Exactly  FPS telemetry sync bridge
@@ -383,7 +379,194 @@ with tab_live_ai:
     render_status_banner()
     st.write("")
 
-    # --- 4. AI ANOMALY MONITOR DECK (Non-Blocking Cached Fragment) ---
+    # --- 4. VEENA DIAGNOSTICS (Parallel: Physics Tuning + ML Quality) ---
+    st.subheader("🎹 Veena Diagnostics")
+    st.caption("Physics Pitch Engine + ML Structural Classifier run simultaneously in parallel.")
+
+    _TONIC_OPTIONS_UI = {
+        "A1 (55 Hz)":   55.00,  "A#1 (58 Hz)":  58.27,  "B1 (62 Hz)":   61.74,
+        "C2 (65 Hz)":   65.41,  "C#2 (69 Hz)":  69.30,  "D2 (73 Hz)":   73.42,
+        "D#2 (78 Hz)":  77.78,  "E2 (82 Hz)":   82.41,  "F2 (87 Hz)":   87.31,
+        "F#2 (93 Hz)":  92.50,  "G2 (98 Hz)":   98.00,  "G#2 (104 Hz)": 103.83,
+        "A2 (110 Hz)":  110.00, "A#2 (117 Hz)": 116.54, "B2 (123 Hz)":  123.47,
+        "C3 (131 Hz)":  130.81, "C#3 (139 Hz)": 138.59, "D3 (147 Hz)":  146.83,
+        "D#3 (156 Hz)": 155.56, "E3 (165 Hz)":  164.81, "F3 (175 Hz)":  174.61,
+        "F#3 (185 Hz)": 185.00,
+    }
+    _TONIC_KEYS = list(_TONIC_OPTIONS_UI.keys())
+    _STRING_OPTIONS = {
+        "S1 — Sarani (Tara Sa, 2× Sa)": "S1",
+        "S2 — Panchama (Pa, 1.5× Sa)": "S2",
+        "S3 — Mandra Sa (tonic)": "S3",
+        "S4 — Anumandra (lower Pa, 0.75× Sa)": "S4",
+        "T1 — Chikari 1 (Sa, 4×)": "T1",
+        "T2 — Chikari 2 (Pa, 6×)": "T2",
+        "T3 — Chikari 3 (Sa, 8×)": "T3",
+        "🔄 Auto-detect from pitch": None,
+    }
+    _STRING_KEYS = list(_STRING_OPTIONS.keys())
+
+    vcfg_col1, vcfg_col2 = st.columns(2)
+    with vcfg_col1:
+        _tonic_key = st.selectbox(
+            "🎵 Sa / Tonic Frequency",
+            _TONIC_KEYS,
+            index=_TONIC_KEYS.index("C3 (131 Hz)"),
+            key="veena_tonic_select",
+            help="Sa anchor. All 7 string targets compute from this.",
+        )
+        veena_tonic_hz = _TONIC_OPTIONS_UI[_tonic_key]
+    with vcfg_col2:
+        _str_key = st.selectbox(
+            "🎻 String Being Plucked",
+            _STRING_KEYS,
+            index=0,
+            key="veena_string_select",
+            help="Which Veena string you are currently plucking.",
+        )
+        veena_string_label = _STRING_OPTIONS[_str_key]
+
+    @st.fragment(
+        run_every=AI_REFRESH_SEC if backend.state == "RECORDING" else None
+    )
+    def render_veena_diagnostics():
+        if os.path.exists(DATA_DIR):
+            _vfiles = [
+                f for f in os.listdir(DATA_DIR)
+                if f.endswith("_piezo.csv") or f.endswith("_audio.wav")
+            ]
+            _all_rec = sorted(
+                {f.replace("_piezo.csv", "").replace("_audio.wav", "") for f in _vfiles},
+                reverse=True,
+            )
+        else:
+            _all_rec = []
+
+        if not _all_rec:
+            with st.container(border=True):
+                st.info(
+                    "💡 **Veena Engine Standing By:** Start recording and pluck a string to trigger diagnostics."
+                )
+            return
+
+        _latest = _all_rec[0]
+        _vkey = f"veena_res_{_latest}_{veena_tonic_hz:.2f}_{veena_string_label}"
+        _now = time.time()
+
+        if (
+            _vkey not in st.session_state
+            or (_now - st.session_state.get(f"{_vkey}_ts", 0)) > 3.5
+        ):
+            st.session_state[_vkey] = backend.analyze_veena_ai(
+                _latest,
+                tonic_hz=veena_tonic_hz,
+                cents_threshold=15.0,
+                string_label=veena_string_label,
+            )
+            st.session_state[f"{_vkey}_ts"] = _now
+
+        vres = st.session_state[_vkey]
+
+        if not vres.get("available", False):
+            with st.container(border=True):
+                st.warning(f"⏳ {vres.get('error', 'Veena engine not yet ready…')}")
+            return
+
+        tuning  = vres.get("tuning", {})
+        quality = vres.get("quality", {})
+        is_healthy = vres.get("is_healthy", True)
+        overall    = vres.get("status", "Unknown")
+
+        if is_healthy:
+            st.success(f"✅ **{overall}** — Instrument is structurally sound.")
+        else:
+            st.error(f"🚨 **{overall}** — Structural issue detected.")
+
+        vc1, vc2 = st.columns(2)
+        with vc1:
+            with st.container(border=True):
+                st.markdown("**🎯 Tuning (Physics Engine)**")
+                if not tuning.get("available", False):
+                    st.warning(tuning.get("error", "Not available."))
+                else:
+                    _STATUS_EMOJI = {
+                        "IN_TUNE": "✅", "FLAT": "⬇️", "SHARP": "⬆️",
+                        "NO_PITCH": "🔇", "SILENCE": "🟤",
+                    }
+                    _tstat  = tuning.get("status", "NO_PITCH")
+                    _cdev   = tuning.get("cents_dev", 0.0)
+                    _f0     = tuning.get("f0_hz", 0.0)
+                    _tgt    = tuning.get("target_hz", 0.0)
+                    _sname  = tuning.get("string_name", "—")
+                    _msg    = tuning.get("message", "")
+                    st.metric(
+                        label=f"String: {_sname}",
+                        value=f"{_STATUS_EMOJI.get(_tstat, '?')} {_tstat}",
+                        delta=f"{_cdev:+.1f} cents",
+                        delta_color="normal" if _tstat == "IN_TUNE" else "inverse",
+                    )
+                    st.progress(
+                        max(0.0, min(1.0, (_cdev + 50) / 100.0)),
+                        text=f"Detected: {_f0:.2f} Hz │ Target: {_tgt:.2f} Hz",
+                    )
+                    if _msg:
+                        st.caption(f"📌 {_msg}")
+                    st.caption(
+                        f"Method: `{tuning.get('method', 'n/a')}` │ "
+                        f"pYIN confidence: **{tuning.get('confidence', 0):.2f}**"
+                    )
+        with vc2:
+            with st.container(border=True):
+                st.markdown("**🧠 Structural Quality (ML)**")
+                if not quality.get("available", False):
+                    st.warning(quality.get("error", "Not available."))
+                else:
+                    _qok    = quality.get("is_healthy", True)
+                    _qlabel = quality.get("label", "Unknown")
+                    _qconf  = quality.get("confidence", 0.0)
+                    _qcls   = quality.get("fault_class", -1)
+                    _badge  = "✅ Healthy" if _qok else f"🚨 {_qlabel}"
+                    st.metric(
+                        label="Fault Classification",
+                        value=_badge,
+                        delta=f"{_qconf:.1f}% confidence",
+                        delta_color="normal" if _qok else "inverse",
+                    )
+                    st.progress(
+                        min(1.0, _qconf / 100.0),
+                        text=f"Class {_qcls} — {_qlabel}",
+                    )
+                    st.caption(
+                        f"Inference: **{quality.get('timing_ms', '?')} ms** │ "
+                        "YAMNet + Energy Decay + HF Flatness"
+                    )
+
+        # Reference Hz table
+        with st.expander("🎷 String Reference Hz — all 7 strings at current tonic"):
+            _rz = {
+                "S1 Sarani":    round(veena_tonic_hz * 2.0,  2),
+                "S2 Panchama":  round(veena_tonic_hz * 1.5,  2),
+                "S3 Mandra Sa": round(veena_tonic_hz * 1.0,  2),
+                "S4 Anumandra": round(veena_tonic_hz * 0.75, 2),
+                "T1 Chikari":   round(veena_tonic_hz * 4.0,  2),
+                "T2 Chikari":   round(veena_tonic_hz * 6.0,  2),
+                "T3 Chikari":   round(veena_tonic_hz * 8.0,  2),
+            }
+            _rc1, _rc2, _rc3, _rc4 = st.columns(4)
+            items = list(_rz.items())
+            for i, col in enumerate([_rc1, _rc2, _rc3, _rc4]):
+                with col:
+                    if i < len(items):
+                        col.metric(items[i][0], f"{items[i][1]} Hz")
+                    if i + 4 < len(items):
+                        col.metric(items[i + 4][0], f"{items[i + 4][1]} Hz")
+
+        with st.expander("🔍 Full Diagnostic Report (Raw JSON)"):
+            st.json(vres)
+
+    render_veena_diagnostics()
+    st.markdown("---")
+
     st.subheader("🧠 Real-Time AI Diagnostic & Anomaly Center")
 
     @st.fragment(
@@ -1085,229 +1268,3 @@ with tab_records:
             st.toast("Storage directory wiped clean!", icon="💥")
             time.sleep(0.3)
             st.rerun()
-
-# ==========================================
-# TAB 3: VEENA DIAGNOSTICS
-# ==========================================
-with tab_veena:
-    st.subheader("🎹 Saraswati Veena — Parallel Hybrid Diagnostics")
-    st.caption(
-        "Physics Pitch Engine (tuning) + ML Structural Quality Classifier "
-        "run **simultaneously** in parallel. Results are merged into a single verdict."
-    )
-    st.markdown("---")
-
-    # ── Sidebar configuration inside the tab ─────────────────────────────────
-    TONIC_OPTIONS_UI = {
-        "A1 (55 Hz)":  55.00,  "A#1 (58 Hz)": 58.27,  "B1 (62 Hz)":  61.74,
-        "C2 (65 Hz)":  65.41,  "C#2 (69 Hz)": 69.30,  "D2 (73 Hz)":  73.42,
-        "D#2 (78 Hz)": 77.78,  "E2 (82 Hz)":  82.41,  "F2 (87 Hz)":  87.31,
-        "F#2 (93 Hz)": 92.50,  "G2 (98 Hz)":  98.00,  "G#2 (104 Hz)": 103.83,
-        "A2 (110 Hz)": 110.00, "A#2 (117 Hz)": 116.54, "B2 (123 Hz)": 123.47,
-        "C3 (131 Hz)": 130.81, "C#3 (139 Hz)": 138.59, "D3 (147 Hz)": 146.83,
-        "D#3 (156 Hz)": 155.56, "E3 (165 Hz)": 164.81, "F3 (175 Hz)": 174.61,
-        "F#3 (185 Hz)": 185.00,
-    }
-    TONIC_KEYS = list(TONIC_OPTIONS_UI.keys())
-
-    STRING_OPTIONS = {
-        "S1 — Sarani (Tara Sa, 2× Sa)": "S1",
-        "S2 — Panchama (Pa, 1.5× Sa)": "S2",
-        "S3 — Mandra Sa (tonic)": "S3",
-        "S4 — Anumandra (lower Pa, 0.75× Sa)": "S4",
-        "T1 — Chikari 1 (Sa, 4×)": "T1",
-        "T2 — Chikari 2 (Pa, 6×)": "T2",
-        "T3 — Chikari 3 (Sa, 8×)": "T3",
-        "🔄 Auto-detect from pitch": None,
-    }
-    STRING_KEYS = list(STRING_OPTIONS.keys())
-
-    cfg_col1, cfg_col2 = st.columns(2)
-    with cfg_col1:
-        tonic_key = st.selectbox(
-            "🎵 Sa / Tonic Frequency",
-            TONIC_KEYS,
-            index=TONIC_KEYS.index("C3 (131 Hz)"),
-            key="veena_tonic_select",
-            help="Set the Sarani string (S1 = Tara Sa) reference. All other strings tune relative to this.",
-        )
-        tonic_hz = TONIC_OPTIONS_UI[tonic_key]
-    with cfg_col2:
-        str_key = st.selectbox(
-            "🎻 String Being Plucked",
-            STRING_KEYS,
-            index=0,
-            key="veena_string_select",
-            help="Which Veena string you are currently plucking. Drives the tuning gauge target.",
-        )
-        string_label = STRING_OPTIONS[str_key]
-
-    st.markdown("---")
-
-    # ── Live Veena Diagnostic fragment ───────────────────────────────────────
-    @st.fragment(
-        run_every=AI_REFRESH_SEC if backend.state == "RECORDING" else None
-    )
-    def render_veena_diagnostics():
-        # Find latest recording prefix
-        if os.path.exists(DATA_DIR):
-            valid_files = [
-                f for f in os.listdir(DATA_DIR)
-                if f.endswith("_piezo.csv") or f.endswith("_audio.wav")
-            ]
-            all_rec = sorted(
-                {f.replace("_piezo.csv", "").replace("_audio.wav", "") for f in valid_files},
-                reverse=True,
-            )
-        else:
-            all_rec = []
-
-        if not all_rec:
-            with st.container(border=True):
-                st.info(
-                    "💡 **Veena Engine Standing By:** Record a Veena pluck using the "
-                    "control deck in the Live Telemetry tab to trigger diagnostics."
-                )
-            return
-
-        latest_prefix = all_rec[0]
-        cache_key = f"veena_res_{latest_prefix}_{tonic_hz:.2f}_{string_label}"
-        now_time = time.time()
-
-        if (
-            cache_key not in st.session_state
-            or (now_time - st.session_state.get(f"{cache_key}_ts", 0)) > 3.5
-        ):
-            st.session_state[cache_key] = backend.analyze_veena_ai(
-                latest_prefix,
-                tonic_hz=tonic_hz,
-                cents_threshold=15.0,
-                string_label=string_label,
-            )
-            st.session_state[f"{cache_key}_ts"] = now_time
-
-        vres = st.session_state[cache_key]
-
-        if not vres.get("available", False):
-            with st.container(border=True):
-                st.warning(f"⏳ {vres.get('error', 'Veena engine not yet ready…')}")
-            return
-
-        tuning  = vres.get("tuning", {})
-        quality = vres.get("quality", {})
-        overall_status = vres.get("status", "Unknown")
-        is_healthy     = vres.get("is_healthy", True)
-
-        # ── Overall verdict banner ───────────────────────────────────────────
-        if is_healthy:
-            st.success(f"✅ **Overall Verdict: {overall_status}** — Instrument is structurally sound.")
-        else:
-            st.error(f"🚨 **Overall Verdict: {overall_status}** — A structural issue was detected.")
-
-        st.write("")
-
-        # ── Row 1: Tuning Gauge + Quality Card ──────────────────────────────
-        col_tune, col_qual = st.columns([1, 1])
-
-        # --- TUNING GAUGE ---
-        with col_tune:
-            with st.container(border=True):
-                st.markdown("**🎯 Tuning (Physics Pitch Engine)**")
-                if not tuning.get("available", False):
-                    st.warning(tuning.get("error", "Physics engine not available."))
-                else:
-                    t_status  = tuning.get("status", "NO_PITCH")
-                    cents_dev = tuning.get("cents_dev", 0.0)
-                    f0        = tuning.get("f0_hz", 0.0)
-                    target    = tuning.get("target_hz", 0.0)
-                    str_name  = tuning.get("string_name", "—")
-                    msg       = tuning.get("message", "")
-
-                    # Colour + emoji based on status
-                    STATUS_STYLE = {
-                        "IN_TUNE":  ("✅", "green"),
-                        "FLAT":     ("⬇️", "orange"),
-                        "SHARP":    ("⬆️", "red"),
-                        "NO_PITCH": ("🔇", "grey"),
-                        "SILENCE":  ("🟤", "grey"),
-                    }
-                    emoji, _ = STATUS_STYLE.get(t_status, ("❓", "grey"))
-
-                    st.metric(
-                        label=f"String: {str_name}",
-                        value=f"{emoji} {t_status}",
-                        delta=f"{cents_dev:+.1f} cents",
-                        delta_color="normal" if t_status == "IN_TUNE" else "inverse",
-                    )
-
-                    # Cents gauge bar: range [-50, +50], center = 0
-                    gauge_val = max(0.0, min(1.0, (cents_dev + 50) / 100.0))
-                    st.progress(gauge_val, text=f"Detected: {f0:.2f} Hz | Target: {target:.2f} Hz")
-
-                    if msg:
-                        st.caption(f"📌 {msg}")
-
-                    conf = tuning.get("confidence", 0.0)
-                    st.caption(
-                        f"Method: `{tuning.get('method', 'n/a')}` | "
-                        f"pYIN confidence: **{conf:.2f}**"
-                    )
-
-        # --- QUALITY CARD ---
-        with col_qual:
-            with st.container(border=True):
-                st.markdown("**🧠 Structural Quality (ML Classifier)**")
-                if not quality.get("available", False):
-                    st.warning(quality.get("error", "ML classifier not available."))
-                else:
-                    q_label  = quality.get("label", "Unknown")
-                    q_conf   = quality.get("confidence", 0.0)
-                    q_class  = quality.get("fault_class", -1)
-                    q_ok     = quality.get("is_healthy", True)
-
-                    badge = "✅ Healthy" if q_ok else f"🚨 {q_label}"
-                    st.metric(
-                        label="Fault Classification",
-                        value=badge,
-                        delta=f"{q_conf:.1f}% confidence",
-                        delta_color="normal" if q_ok else "inverse",
-                    )
-                    st.progress(
-                        min(1.0, q_conf / 100.0),
-                        text=f"Class ID: {q_class} — {q_label}",
-                    )
-                    st.caption(
-                        f"Inference time: **{quality.get('timing_ms', '?')} ms** "
-                        f"| YAMNet + Energy Decay + HF Flatness features"
-                    )
-
-        # ── Reference String Info ────────────────────────────────────────────
-        st.write("")
-        with st.container(border=True):
-            st.markdown("**🎷 Tuning Reference (Sa Anchor)**")
-            s1_hz  = round(tonic_hz * 2.0, 2)   # S1 Sarani = Tara Sa = 2× tonic
-            s2_hz  = round(tonic_hz * 1.5, 2)   # S2 Panchama
-            s3_hz  = round(tonic_hz * 1.0, 2)   # S3 Mandra Sa
-            s4_hz  = round(tonic_hz * 0.75, 2)  # S4 Anumandra
-            t1_hz  = round(tonic_hz * 4.0, 2)
-            t2_hz  = round(tonic_hz * 6.0, 2)
-            t3_hz  = round(tonic_hz * 8.0, 2)
-            ref_col1, ref_col2, ref_col3, ref_col4 = st.columns(4)
-            with ref_col1:
-                st.metric("S1 Sarani",  f"{s1_hz} Hz", help="Tara Sa — 2× Sa")
-                st.metric("T1 Chikari", f"{t1_hz} Hz", help="4× Sa")
-            with ref_col2:
-                st.metric("S2 Panchama", f"{s2_hz} Hz", help="Pa — 1.5× Sa")
-                st.metric("T2 Chikari", f"{t2_hz} Hz", help="6× Sa")
-            with ref_col3:
-                st.metric("S3 Mandra Sa", f"{s3_hz} Hz", help="Sa (tonic)")
-                st.metric("T3 Chikari", f"{t3_hz} Hz", help="8× Sa")
-            with ref_col4:
-                st.metric("S4 Anumandra", f"{s4_hz} Hz", help="Lower Pa — 0.75× Sa")
-                st.caption("All strings tune relative to S3 (Sa = tonic).")
-
-        # ── Raw JSON Expander ────────────────────────────────────────────────
-        with st.expander("🔍 Expand Full Veena Diagnostic Report (Raw JSON)"):
-            st.json(vres)
-
-    render_veena_diagnostics()
