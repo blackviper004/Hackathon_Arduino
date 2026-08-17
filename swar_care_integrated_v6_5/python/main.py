@@ -15,9 +15,21 @@ from engine import SwarCareEngine
 backend = SwarCareEngine.get_instance()
 DATA_DIR = backend.recordings_dir
 
+# Session state initialization for theme and view state
+if "theme_mode" not in st.session_state:
+    st.session_state.theme_mode = "dark"
+
+if "visible_records_limit" not in st.session_state:
+    st.session_state.visible_records_limit = 3
+
+if "prev_engine_state" not in st.session_state:
+    st.session_state.prev_engine_state = backend.state
+
+is_dark = (st.session_state.theme_mode == "dark")
+
 st.set_page_config(page_title="SwarCare Hub", page_icon="📡", layout="centered")
 
-# Sync client time context with backend engine
+# Sync client time context with backend engine & read persisted theme
 components.html(
     """
 <script>
@@ -31,176 +43,252 @@ fetch('/settime', {
     height=0,
 )
 
-# Inject Modern Viewport & Responsive CSS Rules
-st.markdown(
-    """
-<style>
-    /* Centralized Color Tokens & Design System */
-    :root {
-        --bg-primary: #0E1117;
-        --bg-surface: #161B22;
-        --bg-surface-elevated: #21262D;
-        --border-subtle: #30363D;
-        --border-accent: #00BCD4;
-        --text-primary: #F0F6FC;
-        --text-secondary: #8B949E;
-        --text-muted: #6E7681;
-        --accent-cyan: #00BCD4;
-        --accent-green: #00E676;
-        --accent-amber: #FFA000;
-        --accent-red: #FF5252;
-        --btn-bg: #21262D;
-        --btn-text: #F0F6FC;
-        --btn-border: #30363D;
-        --btn-hover-bg: #30363D;
-        --btn-disabled-bg: #161B22;
-        --btn-disabled-text: #6E7681;
-        --btn-disabled-border: #21262D;
+# Centralized Theme Design Tokens
+if is_dark:
+    theme_tokens = {
+        "bg_primary": "#0E1117",
+        "bg_surface": "#161B22",
+        "bg_surface_elevated": "#21262D",
+        "border_subtle": "#30363D",
+        "border_accent": "#00BCD4",
+        "text_primary": "#F0F6FC",
+        "text_secondary": "#8B949E",
+        "text_muted": "#6E7681",
+        "accent_cyan": "#00BCD4",
+        "accent_green": "#00E676",
+        "accent_amber": "#FFA000",
+        "accent_red": "#FF5252",
+        "btn_bg": "#21262D",
+        "btn_text": "#F0F6FC",
+        "btn_border": "#30363D",
+        "btn_hover_bg": "#30363D",
+        "btn_disabled_bg": "#161B22",
+        "btn_disabled_text": "#6E7681",
+        "btn_disabled_border": "#21262D",
+        "scope_grid": "#21262D",
+        "scope_axis": "#8B949E",
+        "scope_wave": "#00E676",
+        "term_active": "#00E676",
+        "term_marker_bg": "rgba(0, 188, 212, 0.08)",
+        "term_marker_color": "#00BCD4",
+    }
+else:
+    theme_tokens = {
+        "bg_primary": "#F6F8FA",
+        "bg_surface": "#FFFFFF",
+        "bg_surface_elevated": "#EAEEF2",
+        "border_subtle": "#D0D7DE",
+        "border_accent": "#00838F",
+        "text_primary": "#1F2328",
+        "text_secondary": "#57606A",
+        "text_muted": "#6E7781",
+        "accent_cyan": "#00838F",
+        "accent_green": "#058639",
+        "accent_amber": "#B07000",
+        "accent_red": "#CF222E",
+        "btn_bg": "#FFFFFF",
+        "btn_text": "#1F2328",
+        "btn_border": "#D0D7DE",
+        "btn_hover_bg": "#F3F4F6",
+        "btn_disabled_bg": "#F6F8FA",
+        "btn_disabled_text": "#8C959F",
+        "btn_disabled_border": "#E1E4E8",
+        "scope_grid": "#EAECEF",
+        "scope_axis": "#57606A",
+        "scope_wave": "#058639",
+        "term_active": "#058639",
+        "term_marker_bg": "rgba(0, 131, 143, 0.10)",
+        "term_marker_color": "#00838F",
     }
 
-    /* Global Clean Dark Typography & Theme */
-    .stApp {
-        background-color: var(--bg-primary);
+# Inject Dual-Mode Responsive CSS Rules
+st.markdown(
+    f"""
+<style>
+    :root {{
+        --bg-primary: {theme_tokens['bg_primary']};
+        --bg-surface: {theme_tokens['bg_surface']};
+        --bg-surface-elevated: {theme_tokens['bg_surface_elevated']};
+        --border-subtle: {theme_tokens['border_subtle']};
+        --border-accent: {theme_tokens['border_accent']};
+        --text-primary: {theme_tokens['text_primary']};
+        --text-secondary: {theme_tokens['text_secondary']};
+        --text-muted: {theme_tokens['text_muted']};
+        --accent-cyan: {theme_tokens['accent_cyan']};
+        --accent-green: {theme_tokens['accent_green']};
+        --accent-amber: {theme_tokens['accent_amber']};
+        --accent-red: {theme_tokens['accent_red']};
+        --btn-bg: {theme_tokens['btn_bg']};
+        --btn-text: {theme_tokens['btn_text']};
+        --btn-border: {theme_tokens['btn_border']};
+        --btn-hover-bg: {theme_tokens['btn_hover_bg']};
+        --btn-disabled-bg: {theme_tokens['btn_disabled_bg']};
+        --btn-disabled-text: {theme_tokens['btn_disabled_text']};
+        --btn-disabled-border: {theme_tokens['btn_disabled_border']};
+    }}
+
+    /* Global Typography & Body Background */
+    .stApp {{
+        background-color: var(--bg-primary) !important;
+        color: var(--text-primary) !important;
+        transition: background-color 0.2s ease, color 0.2s ease;
+    }}
+
+    h1, h2, h3, h4, p, span, label, div {{
         color: var(--text-primary);
-    }
+    }}
 
     /* Mobile-First Layout Adjustments */
-    @media (max-width: 640px) {
-        .block-container {
+    @media (max-width: 640px) {{
+        .block-container {{
             padding-left: 0.6rem !important;
             padding-right: 0.6rem !important;
             padding-top: 1rem !important;
             padding-bottom: 2rem !important;
-        }
-        h1 { font-size: 1.4rem !important; color: #FFFFFF !important; }
-        h2 { font-size: 1.15rem !important; color: var(--text-primary) !important; }
-        h3 { font-size: 0.95rem !important; color: var(--text-primary) !important; }
+        }}
+        h1 {{ font-size: 1.35rem !important; }}
+        h2 {{ font-size: 1.12rem !important; }}
+        h3 {{ font-size: 0.95rem !important; }}
 
-        /* Metric Scaling for Mobile Screens */
-        [data-testid="stMetricValue"] {
+        [data-testid="stMetricValue"] {{
             font-size: 1.15rem !important;
-            color: #FFFFFF !important;
-        }
-        [data-testid="stMetricLabel"] {
+        }}
+        [data-testid="stMetricLabel"] {{
             font-size: 0.75rem !important;
-            color: var(--text-secondary) !important;
-        }
-        .stButton button {
+        }}
+        .stButton button {{
             padding-top: 0.5rem !important;
             padding-bottom: 0.5rem !important;
             font-size: 0.82rem !important;
-        }
-    }
+        }}
+    }}
 
-    /* Clean Seamless Iframes with Zero Outer Overflow */
-    iframe {
+    /* Seamless Iframes */
+    iframe {{
         width: 100% !important;
         border: none !important;
         overflow: hidden !important;
         display: block !important;
-    }
+    }}
 
-    /* Polished Card Container Styling */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
+    /* Card Containers */
+    div[data-testid="stVerticalBlockBorderWrapper"] {{
         border-color: var(--border-subtle) !important;
-        background-color: var(--bg-surface);
+        background-color: var(--bg-surface) !important;
         border-radius: 8px;
-        transition: border-color 0.2s ease-in-out;
-    }
+        box-shadow: {"0 4px 12px rgba(0,0,0,0.25)" if is_dark else "0 2px 6px rgba(0,0,0,0.06)"};
+        transition: border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+    }}
 
-    /* Centralized Action Button Styling with Maximum Readability */
+    /* High-Contrast Action & Download Buttons */
     div[data-testid="stButton"] button,
-    div[data-testid="stDownloadButton"] button {
+    div[data-testid="stDownloadButton"] button {{
         background-color: var(--btn-bg) !important;
         color: var(--btn-text) !important;
         border: 1px solid var(--btn-border) !important;
         border-radius: 6px !important;
         font-weight: 600 !important;
+        box-shadow: {"0 2px 4px rgba(0,0,0,0.2)" if is_dark else "0 1px 2px rgba(0,0,0,0.05)"};
         transition: all 0.15s ease-in-out !important;
-    }
+    }}
 
     div[data-testid="stButton"] button:hover:not(:disabled),
-    div[data-testid="stDownloadButton"] button:hover:not(:disabled) {
+    div[data-testid="stDownloadButton"] button:hover:not(:disabled) {{
         background-color: var(--btn-hover-bg) !important;
         border-color: var(--border-accent) !important;
-        color: #FFFFFF !important;
+        color: var(--text-primary) !important;
         box-shadow: 0 2px 8px rgba(0, 188, 212, 0.25) !important;
-    }
+    }}
 
     div[data-testid="stButton"] button:disabled,
-    div[data-testid="stDownloadButton"] button:disabled {
+    div[data-testid="stDownloadButton"] button:disabled {{
         background-color: var(--btn-disabled-bg) !important;
         color: var(--btn-disabled-text) !important;
         border-color: var(--btn-disabled-border) !important;
         opacity: 0.65 !important;
         cursor: not-allowed !important;
-    }
+    }}
 
-    /* Hardware Control Deck Dynamic Button Palette */
-    div[data-testid="column"]:nth-child(1) div[data-testid="stButton"] button:not(:disabled) {
-        border-color: rgba(0, 230, 118, 0.4) !important;
+    /* Hardware Control Deck Dynamic Button Accents */
+    div[data-testid="column"]:nth-child(1) div[data-testid="stButton"] button:not(:disabled) {{
+        border-color: var(--accent-green) !important;
         color: var(--accent-green) !important;
-    }
-    div[data-testid="column"]:nth-child(1) div[data-testid="stButton"] button:hover:not(:disabled) {
+    }}
+    div[data-testid="column"]:nth-child(1) div[data-testid="stButton"] button:hover:not(:disabled) {{
         background-color: rgba(0, 230, 118, 0.15) !important;
         border-color: var(--accent-green) !important;
         box-shadow: 0 2px 10px rgba(0, 230, 118, 0.25) !important;
-    }
+    }}
 
-    div[data-testid="column"]:nth-child(2) div[data-testid="stButton"] button:not(:disabled) {
-        border-color: rgba(255, 160, 0, 0.4) !important;
+    div[data-testid="column"]:nth-child(2) div[data-testid="stButton"] button:not(:disabled) {{
+        border-color: var(--accent-amber) !important;
         color: var(--accent-amber) !important;
-    }
-    div[data-testid="column"]:nth-child(2) div[data-testid="stButton"] button:hover:not(:disabled) {
+    }}
+    div[data-testid="column"]:nth-child(2) div[data-testid="stButton"] button:hover:not(:disabled) {{
         background-color: rgba(255, 160, 0, 0.15) !important;
         border-color: var(--accent-amber) !important;
         box-shadow: 0 2px 10px rgba(255, 160, 0, 0.25) !important;
-    }
+    }}
 
-    div[data-testid="column"]:nth-child(3) div[data-testid="stButton"] button:not(:disabled) {
-        border-color: rgba(255, 82, 82, 0.4) !important;
+    div[data-testid="column"]:nth-child(3) div[data-testid="stButton"] button:not(:disabled) {{
+        border-color: var(--accent-red) !important;
         color: var(--accent-red) !important;
-    }
-    div[data-testid="column"]:nth-child(3) div[data-testid="stButton"] button:hover:not(:disabled) {
+    }}
+    div[data-testid="column"]:nth-child(3) div[data-testid="stButton"] button:hover:not(:disabled) {{
         background-color: rgba(255, 82, 82, 0.15) !important;
         border-color: var(--accent-red) !important;
         box-shadow: 0 2px 10px rgba(255, 82, 82, 0.25) !important;
-    }
+    }}
 
     /* Tabs Styling */
-    div[data-testid="stTabs"] button {
+    div[data-testid="stTabs"] button {{
         color: var(--text-secondary) !important;
         font-weight: 600 !important;
-    }
-    div[data-testid="stTabs"] button[aria-selected="true"] {
+    }}
+    div[data-testid="stTabs"] button[aria-selected="true"] {{
         color: var(--accent-cyan) !important;
         border-bottom-color: var(--accent-cyan) !important;
-    }
+    }}
 
-    /* Inputs, Selectboxes & Dropdowns */
-    div[data-baseweb="select"] > div {
+    /* Selectboxes, Inputs & Expander Wrappers */
+    div[data-baseweb="select"] > div {{
         background-color: var(--bg-surface) !important;
         border-color: var(--border-subtle) !important;
         color: var(--text-primary) !important;
-    }
-    div[data-baseweb="input"] input {
+    }}
+    div[data-baseweb="input"] input {{
         background-color: var(--bg-surface) !important;
         color: var(--text-primary) !important;
-    }
+    }}
+    details {{
+        background-color: var(--bg-surface) !important;
+        border: 1px solid var(--border-subtle) !important;
+        border-radius: 6px !important;
+    }}
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-# Session state initialization
-if "visible_records_limit" not in st.session_state:
-    st.session_state.visible_records_limit = 3
+# ==========================================
+# 🌟 TOP HEADER WITH THEME TOGGLE SWITCH
+# ==========================================
+head_col1, head_col2 = st.columns([5, 1.4])
+with head_col1:
+    st.title("🎵 SwarCare Anomaly Detection Hub")
+    st.write("Real-Time Vibration & Audio Stream Intelligence")
+with head_col2:
+    st.write("")  # Vertical spacing alignment
+    theme_toggle_label = "☀️ Light Mode" if is_dark else "🌙 Dark Mode"
+    if st.button(
+        theme_toggle_label,
+        key="theme_toggle_header_btn",
+        use_container_width=True,
+        help="Switch visual theme between Dark and Light mode",
+    ):
+        st.session_state.theme_mode = "light" if is_dark else "dark"
+        st.rerun()
 
-if "prev_engine_state" not in st.session_state:
-    st.session_state.prev_engine_state = backend.state
-
-st.title("🎵 SwarCare Anomaly Detection Hub")
-st.write("Real-Time Vibration & Audio Stream Intelligence")
 st.markdown("---")
 
 
@@ -375,31 +463,31 @@ with tab_live_ai:
 
     sync_telemetry_to_local_storage()
 
-    # --- 2. RECORDING TIMER (Strictly Monotonic Local Clock Engine) ---
-    timer_static_html = """
+    # --- 2. RECORDING TIMER (Theme-Adaptive Local Clock Engine) ---
+    timer_static_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8">
         <style>
-            * { box-sizing: border-box; }
-            html, body { margin:0; padding:0; background:transparent; overflow:hidden; font-family:Consolas, 'Courier New', monospace; width:100%; height:100%; }
-            .box { 
-                background-color:#161B22; 
-                border:1px solid #30363D; 
-                border-radius:6px; 
-                padding:8px 12px; 
-                text-align:center; 
-                width:100%; 
-                height:68px; 
-                display:flex; 
-                flex-direction:column; 
-                justify-content:center; 
-                align-items:center;
+            * {{ box-sizing: border-box; }}
+            html, body {{ margin:0; padding:0; background:transparent; overflow:hidden; font-family:Consolas, 'Courier New', monospace; width:100%; height:100%; }}
+            .box {{ 
+                background-color: {theme_tokens['bg_surface']}; 
+                border: 1px solid {theme_tokens['border_subtle']}; 
+                border-radius: 6px; 
+                padding: 8px 12px; 
+                text-align: center; 
+                width: 100%; 
+                height: 68px; 
+                display: flex; 
+                flex-direction: column; 
+                justify-content: center; 
+                align-items: center;
                 transition: border-color 0.25s ease, box-shadow 0.25s ease; 
-            }
-            .lab { color:#8B949E; font-weight:bold; font-size:11px; letter-spacing:1px; transition: color 0.25s ease; }
-            .val { color:#C9D1D9; font-size:26px; font-weight:bold; letter-spacing:2px; margin-top:2px; font-variant-numeric: tabular-nums; }
+            }}
+            .lab {{ color: {theme_tokens['text_secondary']}; font-weight: bold; font-size: 11px; letter-spacing: 1px; transition: color 0.25s ease; }}
+            .val {{ color: {theme_tokens['text_primary']}; font-size: 26px; font-weight: bold; letter-spacing: 2px; margin-top: 2px; font-variant-numeric: tabular-nums; }}
         </style>
     </head>
     <body>
@@ -415,110 +503,116 @@ with tab_live_ai:
             let tryHttp = true;
             let fetchInFlight = false;
 
-            function fmt(sec) {
+            const recColor = "{theme_tokens['accent_green']}";
+            const pauseColor = "{theme_tokens['accent_amber']}";
+            const stopColor = "{theme_tokens['accent_cyan']}";
+            const idleBorder = "{theme_tokens['border_subtle']}";
+            const idleText = "{theme_tokens['text_secondary']}";
+
+            function fmt(sec) {{
                 sec = Math.max(0, Math.floor(sec));
                 const hh = String(Math.floor(sec / 3600)).padStart(2, '0');
                 const mm = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
                 const ss = String(sec % 60).padStart(2, '0');
                 return hh + ':' + mm + ':' + ss;
-            }
+            }}
 
-            function updateUI() {
+            function updateUI() {{
                 const box = document.getElementById('mainbox');
                 const lab = document.getElementById('mainlab');
                 const val = document.getElementById('tval');
                 if (!box || !lab || !val) return;
 
-                if (state === "PAUSED") {
+                if (state === "PAUSED") {{
                     anchorStartMs = null;
-                    box.style.borderColor = "#FFA000";
-                    lab.style.color = "#FFA000";
+                    box.style.borderColor = pauseColor;
+                    lab.style.color = pauseColor;
                     lab.textContent = "⏱️ PAUSED AT";
                     val.textContent = fmt(serverElapsed);
-                } else if (state === "STOPPING") {
+                }} else if (state === "STOPPING") {{
                     anchorStartMs = null;
-                    box.style.borderColor = "#00BCD4";
-                    lab.style.color = "#00BCD4";
+                    box.style.borderColor = stopColor;
+                    lab.style.color = stopColor;
                     lab.textContent = "⏱️ SAVING RECORDING...";
                     val.textContent = fmt(serverElapsed);
-                } else if (state === "RECORDING") {
-                    box.style.borderColor = "#00E676";
-                    lab.style.color = "#00E676";
+                }} else if (state === "RECORDING") {{
+                    box.style.borderColor = recColor;
+                    lab.style.color = recColor;
                     lab.textContent = "⏱️ RECORDING TIME";
 
                     const now = performance.now();
-                    if (anchorStartMs === null) {
+                    if (anchorStartMs === null) {{
                         anchorStartMs = now - (serverElapsed * 1000);
                         maxDisplaySec = serverElapsed;
-                    }
+                    }}
 
                     let calculatedSec = (now - anchorStartMs) / 1000.0;
 
-                    if (serverElapsed > calculatedSec + 1.5) {
+                    if (serverElapsed > calculatedSec + 1.5) {{
                         anchorStartMs = now - (serverElapsed * 1000);
                         calculatedSec = serverElapsed;
-                    }
+                    }}
 
-                    if (calculatedSec > maxDisplaySec) {
+                    if (calculatedSec > maxDisplaySec) {{
                         maxDisplaySec = calculatedSec;
-                    }
+                    }}
 
                     val.textContent = fmt(maxDisplaySec);
-                } else {
+                }} else {{
                     anchorStartMs = null;
                     maxDisplaySec = 0.0;
-                    box.style.borderColor = "#30363D";
-                    lab.style.color = "#8B949E";
+                    box.style.borderColor = idleBorder;
+                    lab.style.color = idleText;
                     lab.textContent = "⏱️ RECORDING TIME";
                     val.textContent = fmt(0);
-                }
-            }
+                }}
+            }}
 
-            function syncData() {
+            function syncData() {{
                 // 1. Read directly from localStorage (instant, synchronous)
-                try {
+                try {{
                     const raw = localStorage.getItem('swarcare_status');
-                    if (raw) {
+                    if (raw) {{
                         const data = JSON.parse(raw);
                         state = data.state;
                         serverElapsed = data.elapsed_s;
-                    }
-                } catch(e) {}
+                    }}
+                }} catch(e) {{}}
 
                 // 2. Non-blocking sidecar HTTP probe
-                if (tryHttp && !fetchInFlight) {
+                if (tryHttp && !fetchInFlight) {{
                     fetchInFlight = true;
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 250);
                     let host = 'localhost';
-                    try {
+                    try {{
                         if (window.parent && window.parent.location && window.parent.location.hostname) host = window.parent.location.hostname;
                         else if (window.location && window.location.hostname) host = window.location.hostname;
-                    } catch(e){}
+                    }} catch(e){{}}
                     if (!host) host = 'localhost';
 
-                    fetch('http://' + host + ':7654/status', {cache: 'no-store', signal: controller.signal})
+                    fetch('http://' + host + ':7654/status', {{cache: 'no-store', signal: controller.signal}})
                         .then(res => res.ok ? res.json() : null)
-                        .then(data => {
-                            if (data) {
+                        .then(data => {{
+                            if (data) {{
                                 state = data.state;
                                 serverElapsed = data.elapsed_s;
-                            }
-                        })
-                        .catch(() => {})
-                        .finally(() => {
+                            }}
+                        }})
+                        .catch(() => {{}})
+                        .finally(() => {{
                             clearTimeout(timeoutId);
                             fetchInFlight = false;
-                        });
-                }
-            }
+                        }});
+                }}
+            }}
 
             setInterval(syncData, 100);
 
-            function animLoop() {
+            function animLoop() {{
                 updateUI();
                 requestAnimationFrame(animLoop);
-            }
+            }}
             requestAnimationFrame(animLoop);
             syncData();
         </script>
@@ -807,40 +901,40 @@ with tab_live_ai:
     # A. VIBRATION SERIAL MONITOR (Piezo Sensor)
     st.subheader("Vibration Serial Monitor (Piezo Sensor)")
 
-    terminal_static_html = """
+    terminal_static_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            * { box-sizing: border-box; }
-            html, body { margin:0; padding:0; background-color:#0E1117; overflow:hidden; font-family:Consolas, 'Courier New', monospace; width:100%; height:100%; }
-            .terminal-box {
-                background-color:#161B22;
-                border:1px solid #30363D;
-                border-radius:6px;
-                height:100%;
-                width:100%;
-                padding:8px;
-                overflow-y:auto;
-                overflow-x:hidden;
+            * {{ box-sizing: border-box; }}
+            html, body {{ margin:0; padding:0; background-color:{theme_tokens['bg_primary']}; overflow:hidden; font-family:Consolas, 'Courier New', monospace; width:100%; height:100%; }}
+            .terminal-box {{
+                background-color: {theme_tokens['bg_surface']};
+                border: 1px solid {theme_tokens['border_subtle']};
+                border-radius: 6px;
+                height: 100%;
+                width: 100%;
+                padding: 8px;
+                overflow-y: auto;
+                overflow-x: hidden;
                 font-size: clamp(9.5px, 2.5vw, 11.5px);
                 letter-spacing: -0.3px;
                 font-variant-numeric: tabular-nums;
                 white-space: pre-wrap;
                 word-break: break-all;
                 transition: border-color 0.25s ease;
-            }
-            .idle-wrap {
+            }}
+            .idle-wrap {{
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 height: 100%;
-                color: #8B949E;
+                color: {theme_tokens['text_secondary']};
                 font-size: 12px;
                 text-align: center;
-            }
+            }}
         </style>
     </head>
     <body>
@@ -855,32 +949,41 @@ with tab_live_ai:
             let fetchInFlight = false;
             let lastRenderedSignature = "";
 
-            function parseSec(txt, idx) {
-                const hhmmss = txt.match(/(?:TIME|T)\\s*:\\s*(\\d{1,2}):(\\d{2}):([\\d.]+)/i);
+            const recBorder = "{theme_tokens['accent_green']}";
+            const pauseBorder = "{theme_tokens['accent_amber']}";
+            const stopBorder = "{theme_tokens['accent_cyan']}";
+            const defaultBorder = "{theme_tokens['border_subtle']}";
+            const normTextCol = "{theme_tokens['text_primary']}";
+            const activeTextCol = "{theme_tokens['term_active']}";
+            const markerBg = "{theme_tokens['term_marker_bg']}";
+            const markerCol = "{theme_tokens['term_marker_color']}";
+
+            function parseSec(txt, idx) {{
+                const hhmmss = txt.match(/(?:TIME|T)\\s*:\\s*(\\d{{1,2}}):(\\d{{2}}):([\\d.]+)/i);
                 if (hhmmss) return parseFloat(hhmmss[1]) * 3600 + parseFloat(hhmmss[2]) * 60 + parseFloat(hhmmss[3]);
-                const mmss = txt.match(/(?:TIME|T)\\s*:\\s*(\\d{1,2}):([\\d.]+)/i);
+                const mmss = txt.match(/(?:TIME|T)\\s*:\\s*(\\d{{1,2}}):([\\d.]+)/i);
                 if (mmss) return parseFloat(mmss[1]) * 60 + parseFloat(mmss[2]);
                 const relT = txt.match(/(?:TIME|T|SEC|SECS)\\s*:\\s*([\\d.]+)/i);
                 if (relT) return parseFloat(relT[1]);
                 return idx / pRate;
-            }
+            }}
 
-            function renderLines(linesData, state) {
+            function renderLines(linesData, state) {{
                 const box = document.getElementById('term-box');
                 if (!box) return;
 
-                if (state === "RECORDING") box.style.borderColor = "#00E676";
-                else if (state === "PAUSED") box.style.borderColor = "#FFA000";
-                else if (state === "STOPPING") box.style.borderColor = "#00BCD4";
-                else box.style.borderColor = "#30363D";
+                if (state === "RECORDING") box.style.borderColor = recBorder;
+                else if (state === "PAUSED") box.style.borderColor = pauseBorder;
+                else if (state === "STOPPING") box.style.borderColor = stopBorder;
+                else box.style.borderColor = defaultBorder;
 
-                if (!linesData || linesData.length === 0) {
-                    if (lastRenderedSignature !== "IDLE") {
+                if (!linesData || linesData.length === 0) {{
+                    if (lastRenderedSignature !== "IDLE") {{
                         box.innerHTML = '<div class="idle-wrap">--- SERIAL MONITOR PIPELINE IDLE ---</div>';
                         lastRenderedSignature = "IDLE";
-                    }
+                    }}
                     return;
-                }
+                }}
 
                 // Fast signature check to avoid DOM thrashing if lines have not changed
                 const currentSig = linesData.map(l => (l.text || '') + (l.active ? '1' : '0')).join('|');
@@ -891,7 +994,7 @@ with tab_live_ai:
                 lastSecBlock = null;
                 baseTimeSec = null;
 
-                linesData.forEach((item, idx) => {
+                linesData.forEach((item, idx) => {{
                     let txt = item.text || "";
                     let isAct = item.active || false;
 
@@ -900,64 +1003,64 @@ with tab_live_ai:
                     if (baseTimeSec === null) baseTimeSec = secVal;
 
                     let secBlock = Math.floor(secVal / 2) * 2;
-                    if (lastSecBlock !== null && secBlock !== lastSecBlock) {
+                    if (lastSecBlock !== null && secBlock !== lastSecBlock) {{
                         let relSec = Math.floor((secVal - baseTimeSec) / 2) * 2;
-                        html += `<div style="border-top: 1px dotted #00BCD4; background: rgba(0, 188, 212, 0.08); color: #00BCD4; text-align: center; font-size: 9.5px; margin: 4px 0; padding: 2px 0; font-weight: bold; letter-spacing: 0.5px;">⏱️ ┈┈ 2s MARKER (+${relSec}s) ┈┈</div>`;
-                    }
+                        html += `<div style="border-top: 1px dotted ${{markerCol}}; background: ${{markerBg}}; color: ${{markerCol}}; text-align: center; font-size: 9.5px; margin: 4px 0; padding: 2px 0; font-weight: bold; letter-spacing: 0.5px;">⏱️ ┈┈ 2s MARKER (+${{relSec}}s) ┈┈</div>`;
+                    }}
                     lastSecBlock = secBlock;
 
-                    let col = isAct ? "#00E676" : "#C9D1D9";
-                    html += `<div style="color:${col}; font-weight:bold; line-height:1.35;">${compact}</div>`;
-                });
+                    let col = isAct ? activeTextCol : normTextCol;
+                    html += `<div style="color:${{col}}; font-weight:bold; line-height:1.35;">${{compact}}</div>`;
+                }});
 
                 box.innerHTML = html;
                 box.scrollTop = box.scrollHeight;
-            }
+            }}
 
-            function syncTerminal() {
+            function syncTerminal() {{
                 let linesData = null;
                 let state = "STOPPED";
 
                 // 1. Read from localStorage directly (fast & synchronous)
-                try {
+                try {{
                     const raw = localStorage.getItem('swarcare_piezo');
-                    if (raw) {
+                    if (raw) {{
                         const data = JSON.parse(raw);
                         linesData = data.lines;
                         state = data.state;
-                    }
-                } catch(e) {}
+                    }}
+                }} catch(e) {{}}
 
                 // 2. Non-blocking sidecar HTTP probe
-                if (tryHttp && !fetchInFlight) {
+                if (tryHttp && !fetchInFlight) {{
                     fetchInFlight = true;
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 250);
                     let host = 'localhost';
-                    try {
+                    try {{
                         if (window.parent && window.parent.location && window.parent.location.hostname) host = window.parent.location.hostname;
                         else if (window.location && window.location.hostname) host = window.location.hostname;
-                    } catch(e){}
+                    }} catch(e){{}}
                     if (!host) host = 'localhost';
 
-                    fetch('http://' + host + ':7654/piezo_lines', {cache: 'no-store', signal: controller.signal})
+                    fetch('http://' + host + ':7654/piezo_lines', {{cache: 'no-store', signal: controller.signal}})
                         .then(res => res.ok ? res.json() : null)
-                        .then(data => {
-                            if (data && data.lines) {
+                        .then(data => {{
+                            if (data && data.lines) {{
                                 renderLines(data.lines, data.state);
-                            }
-                        })
-                        .catch(() => {})
-                        .finally(() => {
+                            }}
+                        }})
+                        .catch(() => {{}})
+                        .finally(() => {{
                             clearTimeout(timeoutId);
                             fetchInFlight = false;
-                        });
-                }
+                        }});
+                }}
 
-                if (linesData) {
+                if (linesData) {{
                     renderLines(linesData, state);
-                }
-            }
+                }}
+            }}
 
             setInterval(syncTerminal, 180);
             syncTerminal();
@@ -971,37 +1074,46 @@ with tab_live_ai:
     # B. AUDIO LIVE MONITOR (USB Microphone - 24 FPS Oscilloscope)
     st.subheader("Audio Live Monitor (USB Microphone)")
 
-    audio_static_html = """
+    audio_static_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            * { box-sizing: border-box; }
-            html, body { margin:0; padding:0; background-color:#0E1117; overflow:hidden; width:100%; height:100%; }
-            #aC { display:block; background:#161B22; border-radius:6px; border:1px solid #30363D; width:100%; height:100%; }
+            * {{ box-sizing: border-box; }}
+            html, body {{ margin:0; padding:0; background-color:{theme_tokens['bg_primary']}; overflow:hidden; width:100%; height:100%; }}
+            #aC {{ display:block; background:{theme_tokens['bg_surface']}; border-radius:6px; border:1px solid {theme_tokens['border_subtle']}; width:100%; height:100%; }}
         </style>
     </head>
     <body>
         <canvas id="aC"></canvas>
         <script>
-            (function() {
+            (function() {{
                 const canvas = document.getElementById('aC');
                 const ctx = canvas.getContext('2d');
 
-                function updateCanvasDimensions() {
+                const gridColor = "{theme_tokens['scope_grid']}";
+                const borderBoxColor = "{theme_tokens['border_subtle']}";
+                const axisTextColor = "{theme_tokens['scope_axis']}";
+                const activeWaveColor = "{theme_tokens['scope_wave']}";
+                const pausedWaveColor = "{theme_tokens['accent_amber']}";
+                const stoppedWaveColor = "{theme_tokens['text_secondary']}";
+                const markerColor = "{theme_tokens['term_marker_color']}";
+                const labelTextColor = "{theme_tokens['text_primary']}";
+
+                function updateCanvasDimensions() {{
                     const dpr = window.devicePixelRatio || 1;
                     const containerWidth = window.innerWidth || 360;
                     const containerHeight = window.innerHeight || 200;
                     canvas.width = containerWidth * dpr;
                     canvas.height = containerHeight * dpr;
                     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                    return { w: containerWidth, h: containerHeight };
-                }
+                    return {{ w: containerWidth, h: containerHeight }};
+                }}
 
                 let dims = updateCanvasDimensions();
-                window.addEventListener('resize', () => { dims = updateCanvasDimensions(); });
+                window.addEventListener('resize', () => {{ dims = updateCanvasDimensions(); }});
 
                 const visibleWindowSec = 4.0;
                 let history = [];
@@ -1017,52 +1129,52 @@ with tab_live_ai:
                 const frameIntervalMs = 1000 / targetFPS;
                 let lastRenderMs = performance.now();
 
-                function fetchAudioData() {
+                function fetchAudioData() {{
                     // 1. Read from localStorage directly (fast & synchronous)
-                    try {
+                    try {{
                         const raw = localStorage.getItem('swarcare_audio');
-                        if (raw) {
+                        if (raw) {{
                             const data = JSON.parse(raw);
-                            if (data.samples && data.samples.length > 0) {
+                            if (data.samples && data.samples.length > 0) {{
                                 history = data.samples;
-                            }
+                            }}
                             serverTimeSec = data.elapsed_s || 0.0;
                             state = data.state || "STOPPED";
                             lastFetchMs = performance.now();
-                        }
-                    } catch(e) {}
+                        }}
+                    }} catch(e) {{}}
 
                     // 2. Non-blocking sidecar HTTP probe
-                    if (tryHttp && !fetchInFlight) {
+                    if (tryHttp && !fetchInFlight) {{
                         fetchInFlight = true;
                         const controller = new AbortController();
                         const timeoutId = setTimeout(() => controller.abort(), 250);
                         let host = 'localhost';
-                        try {
+                        try {{
                             if (window.parent && window.parent.location && window.parent.location.hostname) host = window.parent.location.hostname;
                             else if (window.location && window.location.hostname) host = window.location.hostname;
-                        } catch(e){}
+                        }} catch(e){{}}
                         if (!host) host = 'localhost';
 
-                        fetch('http://' + host + ':7654/audio_data', {cache: 'no-store', signal: controller.signal})
+                        fetch('http://' + host + ':7654/audio_data', {{cache: 'no-store', signal: controller.signal}})
                             .then(res => res.ok ? res.json() : null)
-                            .then(data => {
-                                if (data && data.samples && data.samples.length > 0) {
+                            .then(data => {{
+                                if (data && data.samples && data.samples.length > 0) {{
                                     history = data.samples;
                                     serverTimeSec = data.elapsed_s || 0.0;
                                     state = data.state || "STOPPED";
                                     lastFetchMs = performance.now();
-                                }
-                            })
-                            .catch(() => {})
-                            .finally(() => {
+                                }}
+                            }})
+                            .catch(() => {{}})
+                            .finally(() => {{
                                 clearTimeout(timeoutId);
                                 fetchInFlight = false;
-                            });
-                    }
-                }
+                            }});
+                    }}
+                }}
 
-                function draw() {
+                function draw() {{
                     const dpr = window.devicePixelRatio || 1;
                     const w = canvas.width / dpr;
                     const h = canvas.height / dpr;
@@ -1070,16 +1182,16 @@ with tab_live_ai:
                     const nowMs = performance.now();
                     lastFrameMs = nowMs;
 
-                    if (state === "RECORDING") {
+                    if (state === "RECORDING") {{
                         let targetTimeSec = serverTimeSec + ((nowMs - lastFetchMs) / 1000.0);
-                        if (displayTimeSec === 0 || Math.abs(displayTimeSec - targetTimeSec) > 1.0) {
+                        if (displayTimeSec === 0 || Math.abs(displayTimeSec - targetTimeSec) > 1.0) {{
                             displayTimeSec = targetTimeSec;
-                        } else {
+                        }} else {{
                             displayTimeSec += (targetTimeSec - displayTimeSec) * 0.25;
-                        }
-                    } else {
+                        }}
+                    }} else {{
                         displayTimeSec = serverTimeSec;
-                    }
+                    }}
 
                     const isMobile = w < 480;
                     const padLeft = isMobile ? 56 : 68;
@@ -1094,23 +1206,23 @@ with tab_live_ai:
                     ctx.clearRect(0, 0, w, h);
 
                     // Grid lines
-                    ctx.strokeStyle = '#21262D';
+                    ctx.strokeStyle = gridColor;
                     ctx.lineWidth = 1;
-                    for(let i = 0; i <= 4; i++) {
+                    for(let i = 0; i <= 4; i++) {{
                         let y = padTop + (plotH / 4) * i;
                         ctx.beginPath(); ctx.moveTo(padLeft, y); ctx.lineTo(w - padRight, y); ctx.stroke();
-                    }
+                    }}
 
-                    ctx.strokeStyle = '#30363D';
+                    ctx.strokeStyle = borderBoxColor;
                     ctx.lineWidth = 1.5;
                     ctx.strokeRect(padLeft, padTop, plotW, plotH);
 
                     ctx.setLineDash([3, 3]);
-                    ctx.strokeStyle = '#8B949E';
+                    ctx.strokeStyle = axisTextColor;
                     ctx.beginPath(); ctx.moveTo(padLeft, midY); ctx.lineTo(w - padRight, midY); ctx.stroke();
                     ctx.setLineDash([]);
 
-                    ctx.fillStyle = '#8B949E';
+                    ctx.fillStyle = axisTextColor;
                     ctx.font = isMobile ? '8.5px monospace' : '10px monospace';
                     ctx.textAlign = 'right';
                     ctx.textBaseline = 'middle';
@@ -1119,11 +1231,11 @@ with tab_live_ai:
                     ctx.fillText('-1.0', padLeft - 6, padTop + plotH);
 
                     const N = history.length;
-                    if(N > 0 && state !== "STOPPED") {
-                        ctx.fillStyle = state === "RECORDING" ? '#00E676' : '#FFA000';
+                    if(N > 0 && state !== "STOPPED") {{
+                        ctx.fillStyle = (state === "RECORDING") ? activeWaveColor : pausedWaveColor;
                         const barWidth = isMobile ? 1.5 : 2.0;
 
-                        for (let col = 0; col < plotW; col += barWidth) {
+                        for (let col = 0; col < plotW; col += barWidth) {{
                             let x = padLeft + col;
                             let sampleIdx = Math.floor((col / plotW) * N);
                             if (sampleIdx >= N) sampleIdx = N - 1;
@@ -1131,39 +1243,39 @@ with tab_live_ai:
                             let amplitude = Math.abs(history[sampleIdx]);
                             let barHeight = Math.max(2, amplitude * (plotH * 0.88));
                             ctx.fillRect(x, midY - (barHeight / 2), barWidth, barHeight);
-                        }
-                    } else if (N > 0 && state === "STOPPED") {
-                        ctx.fillStyle = '#8B949E';
+                        }}
+                    }} else if (N > 0 && state === "STOPPED") {{
+                        ctx.fillStyle = stoppedWaveColor;
                         const barWidth = isMobile ? 1.5 : 2.0;
-                        for (let col = 0; col < plotW; col += barWidth) {
+                        for (let col = 0; col < plotW; col += barWidth) {{
                             let x = padLeft + col;
                             let sampleIdx = Math.floor((col / plotW) * N);
                             if (sampleIdx >= N) sampleIdx = N - 1;
                             let amplitude = Math.abs(history[sampleIdx]);
                             let barHeight = Math.max(2, amplitude * (plotH * 0.88));
                             ctx.fillRect(x, midY - (barHeight / 2), barWidth, barHeight);
-                        }
-                    } else {
-                        ctx.fillStyle = '#8B949E';
+                        }}
+                    }} else {{
+                        ctx.fillStyle = axisTextColor;
                         ctx.font = isMobile ? '10px monospace' : '11.5px monospace';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText('--- AUDIO MONITOR IDLE ---', padLeft + plotW / 2, midY);
-                    }
+                    }}
 
                     // Clean 2-second time markers
                     const pixelsPerSec = plotW / visibleWindowSec;
                     const start2sMarker = Math.floor(Math.max(0, displayTimeSec - visibleWindowSec) / 2.0) * 2.0;
                     const end2sMarker = displayTimeSec + 2.0;
 
-                    for(let tMark = start2sMarker; tMark <= end2sMarker; tMark += 2.0) {
+                    for(let tMark = start2sMarker; tMark <= end2sMarker; tMark += 2.0) {{
                         let markOffset = displayTimeSec - tMark;
                         let markX = (w - padRight) - (markOffset * pixelsPerSec);
 
-                        if (markX >= padLeft && markX <= (w - padRight)) {
+                        if (markX >= padLeft && markX <= (w - padRight)) {{
                             ctx.save();
                             ctx.setLineDash([2, 2]);
-                            ctx.strokeStyle = '#00BCD4';
+                            ctx.strokeStyle = markerColor;
                             ctx.lineWidth = 1;
                             ctx.beginPath();
                             ctx.moveTo(markX, padTop);
@@ -1171,19 +1283,19 @@ with tab_live_ai:
                             ctx.stroke();
                             ctx.restore();
 
-                            ctx.fillStyle = '#00BCD4';
+                            ctx.fillStyle = markerColor;
                             ctx.font = isMobile ? 'bold 8px monospace' : 'bold 9.5px monospace';
                             ctx.textAlign = 'center';
                             ctx.textBaseline = 'bottom';
                             ctx.fillText(tMark.toFixed(1) + 's', markX, padTop - 2);
 
-                            ctx.fillStyle = '#C9D1D9';
+                            ctx.fillStyle = axisTextColor;
                             ctx.textBaseline = 'top';
                             ctx.fillText(tMark.toFixed(1) + 's', markX, padTop + plotH + 3);
-                        }
-                    }
+                        }}
+                    }}
 
-                    ctx.fillStyle = '#8B949E';
+                    ctx.fillStyle = axisTextColor;
                     ctx.font = isMobile ? 'bold 9.5px monospace' : 'bold 11px monospace';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'top';
@@ -1192,26 +1304,26 @@ with tab_live_ai:
                     ctx.save();
                     ctx.translate(isMobile ? 12 : 14, padTop + plotH / 2);
                     ctx.rotate(-Math.PI / 2);
-                    ctx.fillStyle = '#C9D1D9';
+                    ctx.fillStyle = labelTextColor;
                     ctx.font = isMobile ? 'bold 9px monospace' : 'bold 11px monospace';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText('Normalised Amplitude', 0, 0);
                     ctx.restore();
-                }
+                }}
 
                 setInterval(fetchAudioData, 180);
 
-                function anim(nowMs) {
+                function anim(nowMs) {{
                     requestAnimationFrame(anim);
                     const elapsed = nowMs - lastRenderMs;
-                    if (elapsed >= frameIntervalMs) {
+                    if (elapsed >= frameIntervalMs) {{
                         lastRenderMs = nowMs - (elapsed % frameIntervalMs);
                         draw();
-                    }
-                }
+                    }}
+                }}
                 requestAnimationFrame(anim);
-            })();
+            }})();
         </script>
     </body>
     </html>

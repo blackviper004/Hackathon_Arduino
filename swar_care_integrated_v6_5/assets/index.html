@@ -5,51 +5,93 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SwarCare Saraswati Veena Anomaly Monitor</title>
 <style>
+:root, [data-theme="dark"] {
+  --bg-primary: #0E1117;
+  --bg-surface: #161B22;
+  --bg-surface-elevated: #21262D;
+  --border-subtle: #30363D;
+  --border-accent: #00BCD4;
+  --text-primary: #F0F6FC;
+  --text-secondary: #8B949E;
+  --text-muted: #6E7681;
+  --accent-cyan: #00BCD4;
+  --accent-green: #00E676;
+  --accent-amber: #FFA000;
+  --accent-red: #FF5252;
+  --btn-bg: #21262D;
+  --btn-text: #F0F6FC;
+  --btn-border: #30363D;
+  --btn-hover-bg: #30363D;
+  --card-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+[data-theme="light"] {
+  --bg-primary: #F6F8FA;
+  --bg-surface: #FFFFFF;
+  --bg-surface-elevated: #EAEEF2;
+  --border-subtle: #D0D7DE;
+  --border-accent: #00838F;
+  --text-primary: #1F2328;
+  --text-secondary: #57606A;
+  --text-muted: #6E7781;
+  --accent-cyan: #00838F;
+  --accent-green: #058639;
+  --accent-amber: #B07000;
+  --accent-red: #CF222E;
+  --btn-bg: #FFFFFF;
+  --btn-text: #1F2328;
+  --btn-border: #D0D7DE;
+  --btn-hover-bg: #F3F4F6;
+  --card-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+
 *{box-sizing:border-box}
-html,body{margin:0;background:#0E1117;color:#C9D1D9;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+html,body{margin:0;background:var(--bg-primary);color:var(--text-primary);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;transition:background .2s ease,color .2s ease}
 body{min-height:100vh}
 .app{max-width:1180px;margin:auto;padding:24px 18px 40px}
-.hero h1{margin:0;color:#FAFAFA;font-size:clamp(1.4rem,3vw,1.9rem)}
-.hero p{margin:6px 0 0;color:#8B949E;font-size:0.95rem}
-.rule{height:1px;background:#30363D;margin:18px 0}
+.hero{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px}
+.hero h1{margin:0;color:var(--text-primary);font-size:clamp(1.4rem,3vw,1.9rem)}
+.hero p{margin:6px 0 0;color:var(--text-secondary);font-size:0.95rem}
+.theme-btn{border:1px solid var(--border-subtle);background:var(--btn-bg);color:var(--btn-text);padding:8px 14px;border-radius:6px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:0.88rem;transition:all .15s ease}
+.theme-btn:hover{border-color:var(--border-accent);background:var(--btn-hover-bg)}
+.rule{height:1px;background:var(--border-subtle);margin:18px 0}
 .tabs{display:flex;gap:8px}
-.tab{border:1px solid #30363D;background:#161B22;color:#C9D1D9;border-radius:7px;padding:10px 14px;cursor:pointer;font-weight:600;font-size:0.9rem;transition:all .2s ease}
-.tab.active{border-color:#00BCD4;color:#00BCD4;background:#1c232d}
+.tab{border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-secondary);border-radius:7px;padding:10px 14px;cursor:pointer;font-weight:600;font-size:0.9rem;transition:all .2s ease}
+.tab.active{border-color:var(--border-accent);color:var(--accent-cyan);background:var(--bg-surface-elevated)}
 .panel{display:none}
 .panel.active{display:block}
-.card{background:#161B22;border:1px solid #30363D;border-radius:8px;padding:16px;margin:14px 0;box-shadow:0 4px 12px rgba(0,0,0,0.25)}
-.card h2,.card h3{margin:0 0 12px;color:#FAFAFA}
+.card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:8px;padding:16px;margin:14px 0;box-shadow:var(--card-shadow);transition:all .2s ease}
+.card h2,.card h3{margin:0 0 12px;color:var(--text-primary)}
 .card h3{font-size:1.05rem}
 .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.btn{border:1px solid #30363D;border-radius:7px;padding:11px 12px;background:#21262D;color:#FAFAFA;font-weight:600;cursor:pointer;transition:all .15s ease}
-.btn:hover{border-color:#00BCD4;background:#30363d}
+.btn{border:1px solid var(--btn-border);border-radius:7px;padding:11px 12px;background:var(--btn-bg);color:var(--btn-text);font-weight:600;cursor:pointer;transition:all .15s ease}
+.btn:hover{border-color:var(--border-accent);background:var(--btn-hover-bg)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
-.btn-start{border-color:rgba(0,230,118,0.3);color:#00E676}
-.btn-start:hover:not(:disabled){border-color:#00E676;background:rgba(0,230,118,0.15)}
-.btn-pause{border-color:rgba(255,160,0,0.3);color:#FFA000}
-.btn-pause:hover:not(:disabled){border-color:#FFA000;background:rgba(255,160,0,0.15)}
-.btn-stop{border-color:rgba(255,82,82,0.3);color:#FF5252}
-.btn-stop:hover:not(:disabled){border-color:#FF5252;background:rgba(255,82,82,0.15)}
-.status{text-align:center;border:1px solid #30363D;border-radius:6px;padding:10px;margin-bottom:12px;font:bold 13px monospace;color:#8B949E;transition:all .25s ease}
-.terminal{height:190px;overflow-y:auto;overflow-x:hidden;white-space:pre-wrap;word-break:break-all;background:#161B22;border:1px solid #30363D;border-radius:6px;padding:8px;font:bold 11px Consolas,"Courier New",monospace}
+.btn-start{border-color:var(--accent-green);color:var(--accent-green)}
+.btn-start:hover:not(:disabled){background:rgba(0,230,118,0.15)}
+.btn-pause{border-color:var(--accent-amber);color:var(--accent-amber)}
+.btn-pause:hover:not(:disabled){background:rgba(255,160,0,0.15)}
+.btn-stop{border-color:var(--accent-red);color:var(--accent-red)}
+.btn-stop:hover:not(:disabled){background:rgba(255,82,82,0.15)}
+.status{text-align:center;border:1px solid var(--border-subtle);background:var(--bg-surface);border-radius:6px;padding:10px;margin-bottom:12px;font:bold 13px monospace;color:var(--text-secondary);transition:all .25s ease}
+.terminal{height:190px;overflow-y:auto;overflow-x:hidden;white-space:pre-wrap;word-break:break-all;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;padding:8px;font:bold 11px Consolas,"Courier New",monospace;color:var(--text-primary)}
 .terminal .line{line-height:1.35}
-.terminal .idle{display:flex;align-items:center;justify-content:center;height:100%;color:#8B949E;font-size:12px}
-.scope{width:100%;height:210px;background:#161B22;border:1px solid #30363D;border-radius:6px;display:block}
+.terminal .idle{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-secondary);font-size:12px}
+.scope{width:100%;height:210px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:6px;display:block}
 .metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-.metric{background:#161B22;border:1px solid #30363D;border-radius:7px;padding:12px}
-.label{color:#8B949E;font-size:13px}
-.value{font-size:1.3rem;font-weight:600;color:#FAFAFA;margin-top:4px}
-.caption{font-size:12px;color:#8B949E;margin-top:4px}
+.metric{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:7px;padding:12px}
+.label{color:var(--text-secondary);font-size:13px}
+.value{font-size:1.3rem;font-weight:600;color:var(--text-primary);margin-top:4px}
+.caption{font-size:12px;color:var(--text-secondary);margin-top:4px}
 .ai-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.ai-card{background:#0d1117;border:1px solid #30363d;border-radius:7px;padding:12px}
-.ai-value{font-size:1.2rem;font-weight:600;color:#FAFAFA;margin-top:4px}
+.ai-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:7px;padding:12px}
+.ai-value{font-size:1.2rem;font-weight:600;color:var(--text-primary);margin-top:4px}
 .records{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.record{padding:12px;border:1px solid #30363D;border-radius:7px;background:#161B22;margin:8px 0}
-.record-name{font-family:monospace;font-size:12px;word-break:break-all}
+.record{padding:12px;border:1px solid var(--border-subtle);border-radius:7px;background:var(--bg-surface);margin:8px 0}
+.record-name{font-family:monospace;font-size:12px;word-break:break-all;color:var(--text-primary)}
 .record-actions{display:flex;gap:7px;margin-top:8px}
 .small{font-size:12px}
-.muted{color:#8B949E}
-.toast{position:fixed;right:18px;bottom:18px;background:#21262D;border:1px solid #30363D;padding:10px 13px;border-radius:7px;display:none;z-index:20;box-shadow:0 4px 14px rgba(0,0,0,0.5)}
+.muted{color:var(--text-secondary)}
+.toast{position:fixed;right:18px;bottom:18px;background:var(--btn-bg);border:1px solid var(--border-subtle);color:var(--text-primary);padding:10px 13px;border-radius:7px;display:none;z-index:20;box-shadow:0 4px 14px rgba(0,0,0,0.3)}
 @media(max-width:640px){
   .app{padding:16px 10px 30px}
   .controls,.ai-grid,.records,.metrics{grid-template-columns:1fr}
@@ -60,7 +102,13 @@ body{min-height:100vh}
 </head>
 <body>
 <div class="app">
-  <div class="hero"><h1>🎵 SwarCare Anomaly Detection Hub</h1><p>Real-Time Saraswati Veena Vibration &amp; Audio Stream Intelligence</p></div>
+  <div class="hero">
+    <div>
+      <h1>🎵 SwarCare Anomaly Detection Hub</h1>
+      <p>Real-Time Saraswati Veena Vibration &amp; Audio Stream Intelligence</p>
+    </div>
+    <button id="themeToggle" class="theme-btn">☀️ Light Mode</button>
+  </div>
   <div class="rule"></div>
 
   <div class="tabs">
@@ -258,6 +306,23 @@ body{min-height:100vh}
   async function downloadRecord(name){try{const d=await api('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});if(!d.ok){toast('Download failed');return}const bytes=Uint8Array.from(atob(d.data),c=>c.charCodeAt(0));const blob=new Blob([bytes],{type:d.mime});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=d.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}catch(e){toast('Download failed')}}
   async function deleteRecord(name){if(!confirm('Delete '+name+'?'))return;const d=await api('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});toast(d.ok?'✓ Deleted':'⚠️ Delete failed');loadRecords()}
   async function loadRecords(){try{const files=await api('/api/records');const box=$('recordsList');box.innerHTML='';if(!files.length){box.innerHTML='<div class="muted">No CSV/WAV records available.</div>';return}const left=document.createElement('div'),right=document.createElement('div');box.append(left,right);for(const f of files){const el=document.createElement('div');el.className='record';el.innerHTML=`<div class="record-name">${f.name}</div><div class="small muted">${f.type.toUpperCase()} · ${fmtSize(f.size)}</div><div class="record-actions"><button class="btn small">📥 ${f.type.toUpperCase()}</button><button class="btn small">🗑️</button></div>`;el.querySelectorAll('button')[0].onclick=()=>downloadRecord(f.name);el.querySelectorAll('button')[1].onclick=()=>deleteRecord(f.name);(f.type==='csv'?left:right).appendChild(el)}}catch(e){toast('Records request failed')}}
+  // Theme Toggle Persistence & Switcher
+  const themeToggleBtn = $('themeToggle');
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.body.setAttribute('data-theme', theme);
+    themeToggleBtn.textContent = (theme === 'dark') ? '☀️ Light Mode' : '🌙 Dark Mode';
+    try { localStorage.setItem('swarcare_theme', theme); } catch(e){}
+  }
+  let savedTheme = 'dark';
+  try { savedTheme = localStorage.getItem('swarcare_theme') || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); } catch(e){}
+  applyTheme(savedTheme);
+
+  themeToggleBtn.onclick = () => {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+  };
+
   $('recordsRefresh').onclick=loadRecords;
   setStatus();
 })();
