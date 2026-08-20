@@ -40,7 +40,7 @@ class _SwarCareAPIHandler(BaseHTTPRequestHandler):
         eng = _SwarCareAPIHandler.engine_ref
         try:
             if self.path == "/settime":
-                self._json({"ok": True, "server_time_ms": int(time.time() * 1000)})
+                self._json({"ok": True, "server_time_ms": int(eng.get_synced_time() * 1000) if eng else int(time.time() * 1000)})
             else:
                 self.send_response(404)
                 self._cors()
@@ -66,7 +66,7 @@ class _SwarCareAPIHandler(BaseHTTPRequestHandler):
         try:
             if self.path == "/status":
                 if eng.state == "RECORDING":
-                    elapsed = time.time() - eng.start_system_time
+                    elapsed = eng.get_synced_time() - eng.start_system_time
                 elif eng.state == "PAUSED":
                     elapsed = eng.pause_start_time - eng.start_system_time
                 elif eng.state == "STOPPING":
@@ -76,9 +76,10 @@ class _SwarCareAPIHandler(BaseHTTPRequestHandler):
                 self._json({
                     "state": eng.state,
                     "elapsed_s": round(max(0.0, elapsed), 3),
-                    "server_now_ms": int(time.time() * 1000),
+                    "server_now_ms": int(eng.get_synced_time() * 1000),
                     "piezo_samples": eng.piezo_samples_recorded,
                     "audio_samples": eng.audio_samples_recorded,
+                    "time_synced": eng.time_synced,
                 })
 
             elif self.path == "/audio_data":
@@ -192,6 +193,13 @@ class SwarCareEngine:
         self.stop_system_time = 0.0
         self.current_prefix = ""
 
+        # --- TIME-SYNC FROM CONNECTED DEVICE ---
+        # The UNO Q has no RTC/NTP.  When a device opens the captive portal
+        # it POSTs its real epoch; we store the delta so every future
+        # datetime.now() call can be corrected.
+        self.time_offset = 0.0     # seconds to ADD to time.time()
+        self.time_synced = False    # True once at least one sync succeeds
+
         # High-Speed Telemetry Deque Rings for Fluid Visualizer Updates
         self.piezo_terminal_lines = deque(maxlen=14)
         self.AUDIO_WINDOW_SEC = 4.0
@@ -297,13 +305,29 @@ class SwarCareEngine:
             return list(self.audio_raw_window)
 
     # -----------------------------------------------------------------------
+    # TIME-SYNC HELPERS
+    # -----------------------------------------------------------------------
+
+    def set_time_offset(self, device_epoch_s: float) -> None:
+        """Compute and store the offset between the device's real clock and
+        the server's monotonic-ish time.time().  Can be called multiple times;
+        the latest sync always wins."""
+        self.time_offset = device_epoch_s - time.time()
+        self.time_synced = True
+
+    def get_synced_time(self) -> float:
+        """Return time.time() corrected by the device-supplied offset.
+        Falls back to raw time.time() if no sync has occurred."""
+        return time.time() + self.time_offset
+
+    # -----------------------------------------------------------------------
     # RECORDING LIFECYCLE
     # -----------------------------------------------------------------------
 
     def start_recording(self):
         with self.state_lock:
             if self.state == "PAUSED":
-                paused_duration = time.time() - self.pause_start_time
+                paused_duration = self.get_synced_time() - self.pause_start_time
                 self.start_system_time += paused_duration
                 self.state = "RECORDING"
                 return
@@ -329,7 +353,8 @@ class SwarCareEngine:
             except Exception:
                 next_run_id = 1
 
-            date_stamp = datetime.now(tz=IST).strftime("%Y%m%d_%H%M%S")
+            synced_now = datetime.fromtimestamp(self.get_synced_time(), tz=IST)
+            date_stamp = synced_now.strftime("%Y%m%d_%H%M%S")
             self.current_prefix = f"Rec_{next_run_id:03d}_{date_stamp}"
 
             self.piezo_samples_recorded = 0
@@ -376,7 +401,7 @@ class SwarCareEngine:
                 self.audio_process = None
 
             self.active_session_id = next_run_id
-            self.start_system_time = time.time()
+            self.start_system_time = self.get_synced_time()
             self.stop_system_time = 0.0
             self.state = "RECORDING"
 
@@ -390,12 +415,12 @@ class SwarCareEngine:
         with self.state_lock:
             if self.state == "RECORDING":
                 self.state = "PAUSED"
-                self.pause_start_time = time.time()
+                self.pause_start_time = self.get_synced_time()
 
     def stop_recording(self):
         with self.state_lock:
             if self.state in ["RECORDING", "PAUSED"]:
-                self.stop_system_time = time.time()
+                self.stop_system_time = self.get_synced_time()
                 self.state = "STOPPING"
 
                 if self.audio_process:

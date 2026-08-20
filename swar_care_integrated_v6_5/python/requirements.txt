@@ -1,10 +1,13 @@
-streamlit>=1.30.0
 numpy>=1.24.0
-pandas>=2.0.0
 scipy>=1.10.0
 librosa>=0.10.0
-numba>=0.61.0
-soundfile>=0.12.1
-joblib>=1.3.0
 scikit-learn>=1.2.0
-ai-edge-litert>=1.0.0
+joblib>=1.3.0
+# TFLite runtime — install ONE of the following for the Linux MPU:
+# Raspberry Pi / ARM Linux (recommended for UNO Q):
+tflite-runtime>=2.14.0
+# Google Edge AI alternative:
+#   ai-edge-litert>=1.0.0
+# Full TensorFlow (large desktop fallback):
+#   tensorflow>=2.14.0
+

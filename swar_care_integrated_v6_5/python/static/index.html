@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>SwarCare — Saraswati Veena Anomaly Hub</title>
+<meta name="description" content="Real-time acoustic diagnostic hub for Saraswati Veena — tuning, structural health analysis, and anomaly detection powered by ML.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ======= Header ======= -->
+  <header class="app-header">
+    <div class="header-titles">
+      <h1>🎵 SwarCare Hub</h1>
+      <p class="subtitle">Saraswati Veena — Real-Time Acoustic Diagnostic Console</p>
+    </div>
+    <div class="header-actions">
+      <span id="time-sync-badge" class="sync-badge unsynced">⚠️ Time not synced</span>
+      <button id="theme-toggle-btn" class="btn btn-outline" type="button">☀️ Light Mode</button>
+    </div>
+  </header>
+
+  <hr class="rule">
+
+  <!-- ======= Status Banner ======= -->
+  <div id="status-banner" class="banner banner-error">
+    System Status: <strong>STOPPED / IDLE</strong> ⏹️
+  </div>
+
+  <div class="spacer"></div>
+
+  <!-- ======= Control Deck ======= -->
+  <div class="control-deck">
+    <button id="btn-start" class="btn btn-green" type="button">▶ START RECORDING</button>
+    <button id="btn-pause" class="btn btn-amber" type="button" disabled>⏸ PAUSE</button>
+    <button id="btn-stop"  class="btn btn-red"   type="button" disabled>⏹ STOP</button>
+  </div>
+
+  <!-- ======= Timer Box ======= -->
+  <div id="timer-box" class="timer-box">
+    <div id="timer-label" class="timer-label">⏱️ RECORDING TIME</div>
+    <div id="timer-value" class="timer-value">00:00:00</div>
+  </div>
+
+  <hr class="rule">
+
+  <!-- ======= Tabs ======= -->
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="tab-live"   type="button">📡 Live Monitor</button>
+    <button class="tab-btn"        data-tab="tab-veena"  type="button">🎸 Veena AI</button>
+    <button class="tab-btn"        data-tab="tab-records" type="button">💾 Saved Records</button>
+  </nav>
+
+  <!-- ============================================================
+       TAB 1 — Live Monitor (Terminal + Oscilloscope + Storage)
+       ============================================================ -->
+  <div id="tab-live" class="tab-panel active">
+
+    <!-- Vibration Serial Monitor -->
+    <h3 class="section-title">📟 Vibration Serial Monitor (Piezo Sensor)</h3>
+    <p class="caption">Live piezo vibration data from the Arduino UNO Q serial link. Active lines highlight in green.</p>
+    <div id="terminal-box" class="terminal-box">
+      <div class="idle-wrap">--- SERIAL MONITOR PIPELINE IDLE ---</div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <!-- Audio Live Monitor -->
+    <h3 class="section-title">🎙️ Audio Live Monitor (USB Microphone)</h3>
+    <p class="caption">Real-time normalised amplitude oscilloscope at 24 FPS.</p>
+    <div class="scope-box">
+      <canvas id="audio-canvas"></canvas>
+    </div>
+
+    <hr class="rule">
+
+    <!-- Storage Metrics -->
+    <h3 class="section-title">💾 Storage Metrics</h3>
+    <div class="storage-metrics">
+      <div>
+        <div class="metric-label">PIEZO CSV DATA</div>
+        <div class="spacer"></div>
+        <div class="metric-label">Samples Recorded</div>
+        <div class="metric-value" id="storage-piezo-samples">0</div>
+        <div class="spacer"></div>
+        <div class="metric-label">CSV Lines (header + data)</div>
+        <div class="metric-value" id="storage-piezo-lines">0</div>
+        <div class="spacer"></div>
+        <div class="metric-label">Duration</div>
+        <div class="metric-value" id="storage-piezo-duration">0.00 s</div>
+      </div>
+      <div>
+        <div class="metric-label">AUDIO WAV DATA</div>
+        <div class="spacer"></div>
+        <div class="metric-label">Samples Recorded</div>
+        <div class="metric-value" id="storage-audio-samples">0</div>
+        <div class="spacer"></div>
+        <div class="metric-label">WAV File Samples</div>
+        <div class="metric-value" id="storage-audio-wav">0</div>
+        <div class="spacer"></div>
+        <div class="metric-label">Duration</div>
+        <div class="metric-value" id="storage-audio-duration">0.00 s</div>
+      </div>
+    </div>
+
+  </div><!-- /tab-live -->
+
+
+  <!-- ============================================================
+       TAB 2 — Veena AI Diagnostics
+       ============================================================ -->
+  <div id="tab-veena" class="tab-panel">
+
+    <h3 class="section-title">🎸 Veena Tuning & Structural Diagnostics</h3>
+    <p class="caption">Real-time ML-powered analysis of tuning accuracy, string health, and structural anomalies.</p>
+
+    <!-- Config selectors -->
+    <div class="veena-config">
+      <div class="field">
+        <label for="tonic-select">🎵 Tonic Pitch (Sa)</label>
+        <select id="tonic-select"></select>
+      </div>
+      <div class="field">
+        <label for="string-select">🎻 String Selection</label>
+        <select id="string-select"></select>
+      </div>
+    </div>
+
+    <!-- Master verdict banner -->
+    <div id="veena-master-banner" class="banner banner-info">
+      ⏳ Diagnostic engine initialising…
+    </div>
+
+    <div class="spacer"></div>
+
+    <!-- Key Metrics card -->
+    <div id="veena-metrics-card" class="card hidden">
+      <h3 class="section-title">🔑 Key Diagnostics</h3>
+      <div class="metrics-row">
+        <div>
+          <div class="metric-label">Structural Health</div>
+          <div class="metric-value" id="metric-health-value">—</div>
+          <div class="metric-delta off" id="metric-health-delta">Waiting…</div>
+        </div>
+        <div>
+          <div class="metric-label" id="metric-tuning-label">Tuning</div>
+          <div class="metric-value" id="metric-tuning-value">—</div>
+          <div class="metric-delta off" id="metric-tuning-delta">Waiting…</div>
+        </div>
+        <div>
+          <div class="metric-label">Anomaly Class</div>
+          <div class="metric-value" id="metric-anomaly-value">—</div>
+          <div class="metric-delta off" id="metric-anomaly-delta">Waiting…</div>
+        </div>
+      </div>
+
+      <!-- Tuning progress gauge -->
+      <div class="progress-wrap">
+        <div class="progress-track"><div id="tuning-progress-fill" class="progress-fill"></div></div>
+        <div id="tuning-progress-text" class="progress-text"></div>
+      </div>
+      <p id="tuning-guide-caption" class="caption"></p>
+    </div>
+
+    <!-- Structural depth card -->
+    <div id="structural-depth-card" class="card hidden">
+      <h3 class="section-title">🔬 Structural Depth Analysis</h3>
+      <div id="structural-depth-title" class="metric-value" style="margin-bottom:0.4rem">—</div>
+      <p id="structural-depth-summary" class="caption"></p>
+      <p id="veena-session-caption" class="caption" style="font-size:0.78rem;color:var(--text-muted)"></p>
+    </div>
+
+    <!-- String reference grid -->
+    <details class="expander">
+      <summary>📐 String Reference Frequencies</summary>
+      <div id="string-reference-grid" class="metrics-grid-4"></div>
+    </details>
+
+    <!-- Raw JSON -->
+    <details class="expander">
+      <summary>🔧 Raw JSON Response</summary>
+      <pre id="veena-raw-json" class="json-block">{ }</pre>
+    </details>
+
+  </div><!-- /tab-veena -->
+
+
+  <!-- ============================================================
+       TAB 3 — Saved Records Explorer
+       ============================================================ -->
+  <div id="tab-records" class="tab-panel">
+
+    <h3 class="section-title">💾 Saved Records Explorer</h3>
+    <p class="caption">Browse, rename, download, or delete recorded sessions.</p>
+
+    <div class="records-columns">
+      <div>
+        <h3 class="section-title">📄 CSV Files (Piezo Data)</h3>
+        <div id="csv-file-list"></div>
+      </div>
+      <div>
+        <h3 class="section-title">🎧 WAV Files (Audio)</h3>
+        <div id="wav-file-list"></div>
+      </div>
+    </div>
+
+    <div id="zip-download-wrap" class="hidden" style="margin-top:1rem;">
+      <button id="btn-download-zip" class="btn btn-block" type="button">📦 Download All as ZIP</button>
+    </div>
+
+    <div class="records-controls">
+      <button id="btn-show-more"  class="btn" type="button">🔽 Show More</button>
+      <button id="btn-reset-view" class="btn" type="button" disabled>🔄 Reset View</button>
+      <button id="btn-clear-all"  class="btn btn-red" type="button">💥 Clear All</button>
+    </div>
+
+  </div><!-- /tab-records -->
+
+</div><!-- /app-shell -->
+
+<!-- ======= Scripts (order matters: theme → app → modules) ======= -->
+<script src="/theme.js"></script>
+<script src="/app.js"></script>
+<script src="/scope.js"></script>
+<script src="/terminal.js"></script>
+<script src="/veena.js"></script>
+<script src="/records.js"></script>
+</body>
+</html>
